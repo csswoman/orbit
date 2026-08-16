@@ -1,0 +1,2 @@
+-- Orbit intentionally has no shared seed rows. Every record is owned by an
+-- authenticated user, so sample content should be created after signing in.

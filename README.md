@@ -39,6 +39,22 @@ activa el proveedor en **Authentication → Providers → Google** y sigue las
 instrucciones de Client ID/Secret que muestra Supabase. Si todavía no lo haces,
 puedes usar únicamente el correo.
 
+### Aplicar el schema
+
+Cuando el proyecto ya exista, copia su **Project ref** desde la URL del panel
+(`https://supabase.com/dashboard/project/PROJECT_REF`) y ejecuta:
+
+```bash
+npx supabase login
+npx supabase link --project-ref PROJECT_REF
+npx supabase db push --dry-run
+npx supabase db push
+```
+
+`login` abre el navegador; no pegues el token ni la contraseña de la base de
+datos en archivos versionados. El `dry-run` permite revisar qué migración se
+aplicará antes de modificar el proyecto remoto.
+
 ## Desarrollo
 
 ```bash
@@ -55,5 +71,4 @@ pnpm lint
 pnpm build
 ```
 
-Las migraciones viven en `supabase/migrations` y se añadirán como una entrega
-separada del scaffold.
+Las migraciones versionadas viven en `supabase/migrations`.
