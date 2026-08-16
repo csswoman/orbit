@@ -36,6 +36,16 @@ input {
     var(--orbit-text) 12%,
     var(--orbit-background)
   );
+  --orbit-accent-soft: color-mix(
+    in oklch,
+    var(--orbit-accent) 12%,
+    var(--orbit-surface)
+  );
+  --orbit-accent-strong: color-mix(
+    in oklch,
+    var(--orbit-accent) 82%,
+    var(--orbit-text)
+  );
   --orbit-sidebar: oklch(0.14 0.018 65.1);
   --orbit-nav-text: oklch(0.97 0.006 65.1);
   --orbit-nav-heading: oklch(0.88 0.018 65.1);
@@ -45,6 +55,86 @@ input {
   display: flex;
   background: var(--orbit-background);
   color: var(--orbit-text);
+}
+
+.dashboard-stage {
+  position: relative;
+  isolation: isolate;
+  min-height: calc(100svh - 7.5rem);
+  overflow: hidden;
+  border-radius: 16px;
+  padding: clamp(1rem, 2.8vw, 2.5rem);
+  background: var(--orbit-background);
+}
+
+.dashboard-stage::before,
+.dashboard-stage::after {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  content: "";
+}
+
+.dashboard-stage::before {
+  background-image: var(--orbit-dashboard-image);
+  background-position: center;
+  background-size: cover;
+}
+
+.dashboard-stage::after {
+  z-index: -1;
+  background: var(--orbit-background);
+  opacity: var(--orbit-dashboard-overlay);
+}
+
+.dashboard-panel {
+  border-radius: 16px;
+  background: var(--orbit-surface);
+  color: var(--orbit-text);
+}
+
+.deadline-timing {
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.deadline-timing--overdue {
+  background: oklch(0.94 0.04 25);
+  color: oklch(0.42 0.16 25);
+}
+
+.deadline-timing--today {
+  background: oklch(0.94 0.05 65.1);
+  color: oklch(0.42 0.13 65.1);
+}
+
+.deadline-timing--soon,
+.deadline-timing--future {
+  background: var(--orbit-background);
+  color: var(--orbit-muted);
+}
+
+.dashboard-skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--orbit-text) 7%, var(--orbit-surface)) 25%,
+    color-mix(in oklch, var(--orbit-text) 12%, var(--orbit-surface)) 50%,
+    color-mix(in oklch, var(--orbit-text) 7%, var(--orbit-surface)) 75%
+  );
+  background-size: 200% 100%;
+  animation: dashboard-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes dashboard-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
