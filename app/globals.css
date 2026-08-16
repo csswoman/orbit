@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.17 0.015 65.1);
 }
 
 @theme inline {
@@ -12,15 +12,48 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  margin: 0;
+}
+
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-frame {
+  --orbit-muted: color-mix(
+    in oklch,
+    var(--orbit-text) 68%,
+    var(--orbit-background)
+  );
+  --orbit-line: color-mix(
+    in oklch,
+    var(--orbit-text) 12%,
+    var(--orbit-background)
+  );
+  --orbit-sidebar: oklch(0.14 0.018 65.1);
+  --orbit-nav-text: oklch(0.97 0.006 65.1);
+  --orbit-nav-heading: oklch(0.88 0.018 65.1);
+  --orbit-nav-muted: oklch(0.69 0.016 65.1);
+  --orbit-nav-hover: oklch(1 0 0 / 0.08);
+  min-height: 100svh;
+  display: flex;
+  background: var(--orbit-background);
+  color: var(--orbit-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
