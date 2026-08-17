@@ -10,10 +10,12 @@ export function GachaWorkspace({
   config,
   relationOptions,
   resourcesData,
+  space,
 }: {
   config: SpaceCrudConfig;
   relationOptions: Record<string, RelationOption[]>;
   resourcesData: ResourceData[];
+  space: string;
 }) {
   const gamesResource = config.resources.find((resource) => resource.key === "games");
   const eventsResource = config.resources.find((resource) => resource.key === "events");
@@ -45,6 +47,7 @@ export function GachaWorkspace({
               gamesResource={gamesResource}
               key={game.id}
               relationOptions={relationOptions}
+              space={space}
             />
           ))}
         </div>
@@ -57,9 +60,10 @@ export function GachaWorkspace({
   );
 }
 
-export function GachaGameCreator({ config, relationOptions }: {
+export function GachaGameCreator({ config, relationOptions, space }: {
   config: SpaceCrudConfig;
   relationOptions: Record<string, RelationOption[]>;
+  space: string;
 }) {
   const gamesResource = config.resources.find((resource) => resource.key === "games");
   if (!gamesResource) return null;
@@ -71,7 +75,7 @@ export function GachaGameCreator({ config, relationOptions }: {
         <ChevronDown aria-hidden="true" className="size-4 transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-[var(--orbit-line)] p-4">
-        <ResourceForm mode="create" relationOptions={relationOptions} resource={gamesResource} space="gacha" />
+        <ResourceForm mode="create" relationOptions={relationOptions} resource={gamesResource} space={space} />
       </div>
     </details>
   );
@@ -86,6 +90,7 @@ function GameWorkspace({
   game,
   gamesResource,
   relationOptions,
+  space,
 }: {
   charactersData?: ResourceData;
   charactersResource: CrudResource;
@@ -95,6 +100,7 @@ function GameWorkspace({
   game: CrudRow;
   gamesResource: CrudResource;
   relationOptions: Record<string, RelationOption[]>;
+  space: string;
 }) {
   const gameEvents = eventsData?.items.filter((item) => item.game_id === game.id) ?? [];
   const gameCharacters =
@@ -146,14 +152,14 @@ function GameWorkspace({
                 mode="edit"
                 relationOptions={relationOptions}
                 resource={gamesResource}
-                space="gacha"
+                space={space}
               />
               <div className="mt-5 border-t border-[var(--orbit-line)] pt-3">
                 <DeleteItemForm
                   confirmationMessage="¿Eliminar este juego y todos sus eventos y personajes? Esta acción no se puede deshacer."
                   id={game.id}
                   resource={gamesResource.key}
-                  space="gacha"
+                  space={space}
                 />
               </div>
             </div>
@@ -171,7 +177,7 @@ function GameWorkspace({
             relationOptions={gameRelationOptions}
             resource={eventsResource}
             sectionId={`${game.id}-events`}
-            space="gacha"
+            space={space}
           />
 
           <ResourceSection
@@ -186,7 +192,7 @@ function GameWorkspace({
             relationOptions={gameRelationOptions}
             resource={charactersResource}
             sectionId={`${game.id}-characters`}
-            space="gacha"
+            space={space}
           />
         </div>
       </details>

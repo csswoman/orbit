@@ -2,7 +2,6 @@ import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
-import { getSpace } from "@/lib/spaces";
 
 export type CanvasFont = "classic" | "grotesk" | "soft";
 export type CanvasLayout = "free" | "order";
@@ -36,11 +35,11 @@ export const defaultCanvasPreference: CanvasPreference = {
   theme: "aurora",
 };
 
-export async function getSpaceCanvas(space: string): Promise<{
+export async function getSpaceCanvas(spaceId: string): Promise<{
   preference: CanvasPreference;
   widgets: SpaceWidget[];
 }> {
-  if (!isSupabaseConfigured() || !getSpace(space)) {
+  if (!isSupabaseConfigured()) {
     return { preference: defaultCanvasPreference, widgets: [] };
   }
 
@@ -55,12 +54,12 @@ export async function getSpaceCanvas(space: string): Promise<{
       supabase
         .from("space_preferences")
         .select("canvas_layout, canvas_theme, canvas_font, canvas_positions")
-        .eq("space_type", space)
+        .eq("space_id", spaceId)
         .maybeSingle(),
       supabase
         .from("space_widgets")
         .select("id, widget_type, title, content, image_path, link_url, position_x, position_y, width, height")
-        .eq("space_type", space)
+        .eq("space_id", spaceId)
         .order("updated_at", { ascending: false }),
     ]);
 

@@ -14,6 +14,18 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COLOR_PATTERN = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
 
+async function getOwnedSpace(spaceId: string, userId: string) {
+  if (!UUID_PATTERN.test(spaceId)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("orbit_spaces")
+    .select("id, kind")
+    .eq("id", spaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data && getCrudConfig(String(data.kind)) ? data : null;
+}
+
 export type CrudActionState = {
   message?: string;
   resetKey?: number;
@@ -142,11 +154,21 @@ export async function saveSpaceItem(
   const space = String(formData.get("space") ?? "");
   const resourceKey = String(formData.get("resource") ?? "");
   const id = String(formData.get("id") ?? "");
-  const resource = getCrudResource(space, resourceKey);
-
-  if (!getCrudConfig(space) || !resource || (id && !UUID_PATTERN.test(id))) {
+  if (id && !UUID_PATTERN.test(id)) {
     return error("La solicitud no es válida.");
   }
+
+  const supabase = await createClient();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+
+  if (!userId) {
+    redirect("/login");
+  }
+
+  const ownedSpace = await getOwnedSpace(space, userId);
+  const resource = ownedSpace ? getCrudResource(String(ownedSpace.kind), resourceKey) : undefined;
+  if (!resource) return error("El espacio ya no está disponible.");
 
   let values: Record<string, unknown>;
   try {
@@ -162,25 +184,18 @@ export async function saveSpaceItem(
     );
   }
 
-  const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
-
-  if (!userId) {
-    redirect("/login");
-  }
-
   const query = id
     ? supabase
         .from(resource.table)
         .update(values)
         .eq("id", id)
         .eq("user_id", userId)
+        .eq("space_id", space)
         .select("id")
         .maybeSingle()
     : supabase
         .from(resource.table)
-        .insert({ ...values, user_id: userId })
+        .insert({ ...values, space_id: space, user_id: userId })
         .select("id")
         .single();
 
@@ -195,7 +210,7 @@ export async function saveSpaceItem(
     return error("No se pudo guardar. Revisa los datos e inténtalo otra vez.");
   }
 
-  revalidatePath(`/${space}`);
+  revalidatePath(`/spaces/${space}`);
   revalidatePath("/");
 
   return {
@@ -209,9 +224,7 @@ export async function deleteSpaceItem(formData: FormData) {
   const space = String(formData.get("space") ?? "");
   const resourceKey = String(formData.get("resource") ?? "");
   const id = String(formData.get("id") ?? "");
-  const resource = getCrudResource(space, resourceKey);
-
-  if (!resource || !UUID_PATTERN.test(id)) {
+  if (!UUID_PATTERN.test(id)) {
     return;
   }
 
@@ -223,11 +236,16 @@ export async function deleteSpaceItem(formData: FormData) {
     redirect("/login");
   }
 
+  const ownedSpace = await getOwnedSpace(space, userId);
+  const resource = ownedSpace ? getCrudResource(String(ownedSpace.kind), resourceKey) : undefined;
+  if (!resource) return;
+
   const { error: deleteError } = await supabase
     .from(resource.table)
     .delete()
     .eq("id", id)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("space_id", space);
 
   if (deleteError) {
     console.error("Orbit CRUD deletion failed", {
@@ -238,6 +256,6 @@ export async function deleteSpaceItem(formData: FormData) {
     return;
   }
 
-  revalidatePath(`/${space}`);
+  revalidatePath(`/spaces/${space}`);
   revalidatePath("/");
 }

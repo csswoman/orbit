@@ -2,7 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { getCrudConfig } from "@/lib/space-crud";
+import { getCrudConfig, type SpaceKind } from "@/lib/space-crud";
 import { createClient } from "@/lib/supabase/server";
 
 export type CrudRow = Record<string, unknown> & { id: string };
@@ -24,9 +24,10 @@ export type SpaceWorkspaceData = {
 };
 
 export async function getSpaceWorkspace(
-  slug: string,
+  spaceId: string,
+  kind: SpaceKind,
 ): Promise<SpaceWorkspaceData> {
-  const config = getCrudConfig(slug);
+  const config = getCrudConfig(kind);
 
   if (!config) {
     return { relationOptions: {}, resources: [] };
@@ -46,6 +47,7 @@ export async function getSpaceWorkspace(
         .from(resource.table)
         .select("*")
         .eq("user_id", userId)
+        .eq("space_id", spaceId)
         .order(resource.orderBy, {
           ascending: resource.orderDirection !== "desc",
           nullsFirst: false,
@@ -79,7 +81,7 @@ export async function getSpaceWorkspace(
     }
   }
 
-  if (slug === "gacha" && relationOptions.events) {
+  if (kind === "gacha" && relationOptions.events) {
     const gamesById = new Map(
       (relationOptions.games ?? []).map((game) => [game.value, game.label]),
     );
@@ -92,11 +94,12 @@ export async function getSpaceWorkspace(
     }));
   }
 
-  if (slug === "inspiration") {
+  if (kind === "inspiration") {
     const { data } = await supabase
       .from("projects")
       .select("id, title")
       .eq("user_id", userId)
+      .eq("space_id", spaceId)
       .order("title", { ascending: true });
 
     relationOptions.projects = ((data ?? []) as CrudRow[]).map((item) => ({

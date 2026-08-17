@@ -7,8 +7,9 @@ import { useEffect, useState } from "react";
 import { signOut } from "@/app/(app)/actions";
 import { OrbitLogo } from "@/components/brand/orbit-logo";
 import { NavigationLinks } from "@/components/navigation/navigation-links";
+import type { OrbitSpace } from "@/lib/orbit-spaces";
 
-export function MobileNavigation() {
+export function MobileNavigation({ spaces }: { spaces: OrbitSpace[] }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export function MobileNavigation() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-[var(--orbit-line)] bg-[var(--orbit-background)] px-4 lg:hidden">
+      <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center justify-between border-b border-[var(--orbit-line)] bg-[var(--orbit-background)] px-4 lg:hidden">
         <Link
           aria-label="Ir al inicio de Orbit"
           className="flex min-h-11 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
@@ -68,7 +69,7 @@ export function MobileNavigation() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <NavigationLinks onNavigate={() => setOpen(false)} />
+              <NavigationLinks onNavigate={() => setOpen(false)} spaces={spaces} />
             </div>
 
             <div className="mt-4 space-y-1 border-t border-white/10 pt-4">

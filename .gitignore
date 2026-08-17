@@ -24,6 +24,20 @@
 .DS_Store
 *.pem
 
+# Local agent tooling and downloaded skills
+/.agents/
+/.claude/
+/.codex/
+/.cursor/
+/.continue/
+/.roo/
+
+# Local tool caches and reports
+/playwright-report/
+/test-results/
+/.turbo/
+/.eslintcache
+
 # debug
 npm-debug.log*
 yarn-debug.log*

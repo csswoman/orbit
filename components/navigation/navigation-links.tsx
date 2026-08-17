@@ -1,110 +1,105 @@
 "use client";
 
-import {
-  Apple,
-  FolderKanban,
-  Gamepad2,
-  Heart,
-  House,
-  Luggage,
-  Repeat2,
-  Shirt,
-  Sparkles,
-  Tag,
-  type LucideIcon,
-} from "lucide-react";
+import { House } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { CSSProperties } from "react";
 
-import { spaceGroups } from "@/lib/spaces";
-
-const icons: Record<string, LucideIcon> = {
-  apple: Apple,
-  "folder-kanban": FolderKanban,
-  gamepad: Gamepad2,
-  heart: Heart,
-  luggage: Luggage,
-  repeat: Repeat2,
-  shirt: Shirt,
-  sparkles: Sparkles,
-  tag: Tag,
-};
+import { SpaceNavIcon } from "@/components/navigation/space-nav-icon";
+import { SpaceCreator } from "@/components/navigation/space-creator";
+import type { OrbitSpace } from "@/lib/orbit-spaces";
 
 type NavigationLinksProps = {
   onNavigate?: () => void;
+  spaces: OrbitSpace[];
 };
 
-export function NavigationLinks({ onNavigate }: NavigationLinksProps) {
+export function NavigationLinks({ onNavigate, spaces }: NavigationLinksProps) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Espacios de Orbit" className="space-y-7">
-      <NavigationLink
-        active={pathname === "/"}
+    <nav aria-label="Espacios de Orbit" className="space-y-1">
+      <Link
+        aria-current={pathname === "/" ? "page" : undefined}
+        className={`orbit-nav-link ${
+          pathname === "/"
+            ? "orbit-nav-link--active text-white"
+            : "text-[var(--orbit-nav-text)] hover:bg-[var(--orbit-nav-hover)]"
+        }`}
         href="/"
-        icon={House}
-        label="Inicio"
-        onNavigate={onNavigate}
-      />
+        onClick={onNavigate}
+      >
+        <span className="orbit-nav-link__icon">
+          <House aria-hidden="true" className="size-[1.125rem]" />
+        </span>
+        <span className="min-w-0 truncate">Inicio</span>
+      </Link>
 
-      {spaceGroups.map((group) => (
-        <section className="space-y-2" key={group.id}>
-          <div className="px-3">
-            <h2 className="text-[0.8125rem] font-semibold text-[var(--orbit-nav-heading)]">
-              {group.label}
-            </h2>
-            <p className="mt-0.5 text-xs leading-5 text-[var(--orbit-nav-muted)]">
-              {group.description}
-            </p>
-          </div>
-          <ul className="space-y-1">
-            {group.spaces.map((space) => {
-              const Icon = icons[space.icon];
-              return (
-                <li key={space.slug}>
-                  <NavigationLink
-                    active={pathname.startsWith(space.href)}
-                    href={space.href}
-                    icon={Icon}
-                    label={space.label}
-                    onNavigate={onNavigate}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+      <section className="pt-4">
+        <h2 className="sr-only">Tus spaces</h2>
+        <ul className="space-y-1">
+          {spaces.map((space) => {
+            const href = `/spaces/${space.id}`;
+            return (
+              <li key={space.id}>
+                <NavigationLink
+                  accent={space.accentColor}
+                  active={pathname.startsWith(href)}
+                  href={href}
+                  icon={space.icon}
+                  iconImageUrl={space.iconImageUrl}
+                  label={space.name}
+                  onNavigate={onNavigate}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        <SpaceCreator onCreated={onNavigate} />
+      </section>
     </nav>
   );
 }
 
 function NavigationLink({
+  accent,
   active,
   href,
-  icon: Icon,
+  icon,
+  iconImageUrl,
   label,
   onNavigate,
 }: {
+  accent?: string;
   active: boolean;
   href: string;
-  icon: LucideIcon;
+  icon: string;
+  iconImageUrl?: string | null;
   label: string;
   onNavigate?: () => void;
 }) {
+  const style = accent
+    ? ({ "--space-identity": accent } as CSSProperties)
+    : undefined;
+
   return (
     <Link
       aria-current={active ? "page" : undefined}
-      className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)] ${
-        active
-          ? "orbit-nav-link--active text-white"
-          : "text-[var(--orbit-nav-text)] hover:bg-[var(--orbit-nav-hover)]"
+      className={`orbit-nav-link ${accent ? "orbit-nav-link--space" : ""} ${
+        active && accent
+          ? "orbit-nav-link--space-active"
+          : active
+            ? "orbit-nav-link--active text-white"
+            : "text-[var(--orbit-nav-text)] hover:bg-[var(--orbit-nav-hover)]"
       }`}
       href={href}
       onClick={onNavigate}
+      style={style}
     >
-      <Icon aria-hidden="true" className="size-[1.125rem] shrink-0" />
-      <span>{label}</span>
+      <span className="orbit-nav-link__icon">
+        <SpaceNavIcon icon={icon} iconImageUrl={iconImageUrl ?? null} label={label} />
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
 }

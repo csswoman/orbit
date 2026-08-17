@@ -16,6 +16,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 
 import { createImageWidget, createLinkWidget, createSheetWidget, deleteSpaceWidget, duplicateSpaceWidget, saveCanvasPreference, saveImageWidget, saveSheetWidget, saveWidgetDescription, saveWidgetPosition } from "@/app/(app)/space-widget-actions";
 import { SheetWidget } from "@/components/spaces/sheet-widget";
+import { SpaceSettings } from "@/components/spaces/space-settings";
+import { GradientBg } from "@/components/spaces/gradient-bg";
+import type { OrbitSpace } from "@/lib/orbit-spaces";
 import { createClient } from "@/lib/supabase/client";
 import type { CanvasPreference, SpaceWidget } from "@/lib/space-widgets";
 
@@ -46,10 +49,13 @@ class CanvasPointerSensor extends PointerSensor {
   }];
 }
 
-export function SpaceCanvas({ adjustmentContent, children, preference: initialPreference, space, widgets: initialWidgets }: {
-  adjustmentContent?: ReactNode; children: ReactNode; preference: CanvasPreference; space: string; widgets: SpaceWidget[];
+export function SpaceCanvas({ adjustmentContent, children, preference: initialPreference, space, spaceDetails, widgets: initialWidgets }: {
+  adjustmentContent?: ReactNode; children: ReactNode; preference: CanvasPreference; space: string; spaceDetails: OrbitSpace; widgets: SpaceWidget[];
 }) {
   const [preference, setPreference] = useState(initialPreference);
+  const [accentColor, setAccentColor] = useState(spaceDetails.accentColor);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState(spaceDetails.backgroundImageUrl);
+  const [backgroundOverlay, setBackgroundOverlay] = useState(spaceDetails.backgroundOverlay);
   const [widgets, setWidgets] = useState(initialWidgets);
   const [adjusting, setAdjusting] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -120,13 +126,35 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
 
   function resetCamera() { const next = { x: 0, y: 0, zoom: 1 }; cameraRef.current = next; setCamera(next); }
 
-  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    const target = event.target;
-    if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
-    event.preventDefault();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    changeZoom(camera.zoom - event.deltaY * 0.002, { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
-  }
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+    const viewport = node;
+
+    function onWheel(event: WheelEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      const bounds = viewport.getBoundingClientRect();
+      const activeCamera = cameraRef.current;
+      const zoom = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, Math.round((activeCamera.zoom - event.deltaY * 0.002) * 100) / 100),
+      );
+      const focusX = event.clientX - bounds.left;
+      const focusY = event.clientY - bounds.top;
+      const next = {
+        x: focusX - ((focusX - activeCamera.x) / activeCamera.zoom) * zoom,
+        y: focusY - ((focusY - activeCamera.y) / activeCamera.zoom) * zoom,
+        zoom,
+      };
+      cameraRef.current = next;
+      setCamera(next);
+    }
+
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
 
   function startPan(event: React.PointerEvent<HTMLDivElement>) {
     if (preference.layout !== "free" || event.button !== 0) return;
@@ -234,7 +262,38 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
   }
 
   return (
-    <div className="space-canvas" data-font={preference.font} data-layout={preference.layout} data-theme={preference.theme}>
+    <div
+      className="space-canvas"
+      data-font={preference.font}
+      data-has-background={backgroundImageUrl ? "true" : undefined}
+      data-layout={preference.layout}
+      data-theme={preference.theme}
+      style={{ "--space-accent": accentColor } as CSSProperties}
+    >
+      {backgroundImageUrl ? (
+        <div
+          aria-hidden="true"
+          className="space-canvas__backdrop"
+          style={
+            {
+              "--space-background-image": `url("${backgroundImageUrl.replaceAll('"', "%22")}")`,
+              "--space-background-overlay": backgroundOverlay,
+            } as CSSProperties
+          }
+        />
+      ) : (
+        <GradientBg className="canvas-gradient" />
+      )}
+      <SpaceSettings
+        font={preference.font}
+        onAccentChange={setAccentColor}
+        onBackgroundChange={(url, overlay) => {
+          setBackgroundImageUrl(url);
+          setBackgroundOverlay(overlay);
+        }}
+        onFontChange={(nextFont) => updatePartialPreference({ font: nextFont })}
+        space={spaceDetails}
+      />
       <header className="space-canvas__toolbar">
         <div className="space-canvas__actions">
           <span aria-label="Mover (V)" className="space-canvas__move canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" className="size-4" /></span>
@@ -256,6 +315,7 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
         {adjustmentContent ? <div className="space-canvas__custom-controls">{adjustmentContent}</div> : null}
       </div>
 
+      <div className="space-canvas__stage">
       <DndContext
         onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }}
         onDragMove={keepDraggedItemVisible}
@@ -268,7 +328,7 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
         }}
         sensors={sensors}
       >
-        <div className="space-canvas__viewport" onPointerCancel={endPan} onPointerDown={startPan} onPointerMove={movePan} onPointerUp={endPan} onWheel={handleWheel} ref={viewportRef} style={preference.layout === "free" ? { backgroundPosition: `${camera.x}px ${camera.y}px`, backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px` } : undefined}>
+        <div className="space-canvas__viewport" onPointerCancel={endPan} onPointerDown={startPan} onPointerMove={movePan} onPointerUp={endPan} ref={viewportRef}>
         <div className="space-canvas__board" ref={boardRef} style={preference.layout === "free" ? { transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` } : undefined}>
           {resourceChildren.map((child, index) => {
             const id = `resource:${index}`;
@@ -283,6 +343,7 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
         </div>
         </div>
       </DndContext>
+      </div>
       {preference.layout === "free" ? <div aria-label="Controles de vista" className="canvas-view-controls" role="group">
         <button aria-label="Alejar" className="canvas-tooltip" data-tooltip="Alejar" disabled={camera.zoom <= MIN_ZOOM} onClick={() => changeZoom(camera.zoom - ZOOM_STEP)} type="button"><Minus aria-hidden="true" /></button>
         <button aria-label="Acercar" className="canvas-tooltip" data-tooltip="Acercar" disabled={camera.zoom >= MAX_ZOOM} onClick={() => changeZoom(camera.zoom + ZOOM_STEP)} type="button"><Plus aria-hidden="true" /></button>

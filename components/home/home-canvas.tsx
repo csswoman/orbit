@@ -6,6 +6,7 @@ import { CheckSquare2, Copy, Edit3, Expand, ImagePlus, Link2, Maximize2, Minus, 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { createHomeCanvasItem, deleteHomeCanvasItem, duplicateHomeCanvasItem, saveHomeCanvasItem } from "@/app/(app)/home-canvas-actions";
+import { GradientBg } from "@/components/spaces/gradient-bg";
 import { createClient } from "@/lib/supabase/client";
 import type { HomeCanvasData, HomeCanvasItem, HomeCanvasKind } from "@/lib/home-canvas";
 
@@ -24,6 +25,67 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
 
+function estimateHomeItemSize(kind: HomeCanvasKind) {
+  switch (kind) {
+    case "image":
+      return { height: 300, width: 400 };
+    case "note":
+      return { height: 192, width: 320 };
+    case "task":
+      return { height: 120, width: 320 };
+    case "link":
+      return { height: 80, width: 320 };
+  }
+}
+
+function fitCameraToHomeItems(
+  items: HomeCanvasItem[],
+  viewport: HTMLElement | null,
+  setCamera: (value: { x: number; y: number; zoom: number }) => void,
+  cameraRef: { current: { x: number; y: number; zoom: number } },
+) {
+  const bounds = viewport?.getBoundingClientRect();
+  if (!bounds || items.length === 0 || bounds.width < 64 || bounds.height < 64) return false;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const item of items) {
+    const size = estimateHomeItemSize(item.kind);
+    minX = Math.min(minX, item.positionX);
+    minY = Math.min(minY, item.positionY);
+    maxX = Math.max(maxX, item.positionX + size.width);
+    maxY = Math.max(maxY, item.positionY + size.height);
+  }
+
+  const padding = 96;
+  const contentWidth = Math.max(maxX - minX, 1);
+  const contentHeight = Math.max(maxY - minY, 1);
+  const centerX = minX + contentWidth / 2;
+  const centerY = minY + contentHeight / 2;
+  const zoom = Math.min(
+    MAX_ZOOM,
+    Math.max(
+      MIN_ZOOM,
+      Math.min(
+        (bounds.width - padding * 2) / contentWidth,
+        (bounds.height - padding * 2) / contentHeight,
+      ),
+    ),
+  );
+
+  const next = {
+    x: bounds.width / 2 - centerX * zoom,
+    y: bounds.height / 2 - centerY * zoom,
+    zoom: Math.round(zoom * 100) / 100,
+  };
+  cameraRef.current = next;
+  setCamera(next);
+  return true;
+}
+
 export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const [items, setItems] = useState(data.status === "ready" ? data.items : []);
   const [message, setMessage] = useState<string | null>(null);
@@ -31,7 +93,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const cameraRef = useRef(camera);
   const boardRef = useRef<HTMLDivElement>(null);
-  const shellRef = useRef<HTMLElement>(null);
+  const viewportRef = useRef<HTMLElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const didDragRef = useRef(false);
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null);
@@ -39,6 +101,65 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const [dragCameraStart, setDragCameraStart] = useState<{ x: number; y: number } | null>(null);
   const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const canPersist = data.status === "ready";
+  const didFitCameraRef = useRef(false);
+
+  useEffect(() => {
+    if (data.status === "ready") {
+      setItems(data.items);
+      didFitCameraRef.current = false;
+      return;
+    }
+    if (data.status === "error") setMessage("No se pudieron cargar los elementos del lienzo.");
+    if (data.status === "unauthenticated") setMessage("Inicia sesión para ver tu lienzo.");
+    if (data.status === "unconfigured") setMessage("Configura Supabase para usar el lienzo.");
+  }, [data]);
+
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node || items.length === 0) return;
+
+    const tryFit = () => {
+      if (didFitCameraRef.current) return;
+      if (fitCameraToHomeItems(items, node, setCamera, cameraRef)) {
+        didFitCameraRef.current = true;
+      }
+    };
+
+    tryFit();
+    const observer = new ResizeObserver(tryFit);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [items]);
+
+  useEffect(() => {
+    const node = viewportRef.current;
+    if (!node) return;
+    const shell = node;
+
+    function onWheel(event: WheelEvent) {
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      const bounds = shell.getBoundingClientRect();
+      const activeCamera = cameraRef.current;
+      const zoom = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, Math.round((activeCamera.zoom - event.deltaY * 0.002) * 100) / 100),
+      );
+      const focusX = event.clientX - bounds.left;
+      const focusY = event.clientY - bounds.top;
+      const next = {
+        x: focusX - ((focusX - activeCamera.x) / activeCamera.zoom) * zoom,
+        y: focusY - ((focusY - activeCamera.y) / activeCamera.zoom) * zoom,
+        zoom,
+      };
+      cameraRef.current = next;
+      setCamera(next);
+    }
+
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -66,7 +187,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   });
 
   function nextPosition() {
-    const bounds = shellRef.current?.getBoundingClientRect();
+    const bounds = viewportRef.current?.getBoundingClientRect();
     if (!bounds) return positions[items.length % positions.length];
     const offset = (items.length % positions.length) * 36;
     return { x: clamp((bounds.width / 2 - camera.x) / camera.zoom + offset), y: clamp((bounds.height / 2 - camera.y) / camera.zoom + offset) };
@@ -75,7 +196,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   function changeZoom(nextZoom: number, focus?: { x: number; y: number }) {
     const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(nextZoom * 100) / 100));
     setCamera((current) => {
-      const bounds = shellRef.current?.getBoundingClientRect();
+      const bounds = viewportRef.current?.getBoundingClientRect();
       if (!bounds) { const next = { ...current, zoom }; cameraRef.current = next; return next; }
       const focusX = focus?.x ?? bounds.width / 2;
       const focusY = focus?.y ?? bounds.height / 2;
@@ -85,20 +206,20 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
     });
   }
 
-  function resetCamera() { const next = { x: 0, y: 0, zoom: 1 }; cameraRef.current = next; setCamera(next); }
-
-  function handleWheel(event: React.WheelEvent<HTMLElement>) {
-    const target = event.target;
-    if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return;
-    event.preventDefault();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    changeZoom(camera.zoom - event.deltaY * 0.002, { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+  function resetCamera() {
+    if (items.length > 0) {
+      fitCameraToHomeItems(items, viewportRef.current, setCamera, cameraRef);
+      return;
+    }
+    const next = { x: 0, y: 0, zoom: 1 };
+    cameraRef.current = next;
+    setCamera(next);
   }
 
   function startPan(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0) return;
     const target = event.target;
-    if (!(target instanceof Element) || target.closest(".home-canvas-toolbar, .home-item, button, a, input, textarea, select, [contenteditable='true']")) return;
+    if (!(target instanceof Element) || target.closest(".home-canvas-toolbar, .canvas-view-controls, .home-item, button, a, input, textarea, select, [contenteditable='true']")) return;
     panRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: cameraRef.current.x, y: cameraRef.current.y };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -110,7 +231,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   }
 
   function keepDraggedItemVisible(event: DragMoveEvent) {
-    const bounds = shellRef.current?.getBoundingClientRect();
+    const bounds = viewportRef.current?.getBoundingClientRect();
     const rect = event.active.rect.current.translated;
     if (!bounds || !rect) return;
     const margin = 56;
@@ -203,7 +324,16 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   }
 
   return (
-    <section aria-label="Home creativo" className="home-canvas-shell" onPointerCancel={endPan} onPointerDown={startPan} onPointerMove={movePan} onPointerUp={endPan} onWheel={handleWheel} ref={shellRef} style={{ backgroundPosition: `${camera.x}px ${camera.y}px`, backgroundSize: `${103 * camera.zoom}px ${119 * camera.zoom}px` }}>
+    <section
+      aria-label="Home creativo"
+      className="home-canvas-shell"
+      onPointerCancel={endPan}
+      onPointerDown={startPan}
+      onPointerMove={movePan}
+      onPointerUp={endPan}
+      ref={viewportRef}
+    >
+      <GradientBg className="canvas-gradient" />
       <header className="home-canvas-toolbar">
         <div className="home-canvas-tools" aria-label="Herramientas del lienzo">
           <span aria-label="Mover (V)" className="home-canvas-tools__current canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" /></span>

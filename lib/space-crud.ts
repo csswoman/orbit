@@ -48,6 +48,17 @@ export type SpaceCrudConfig = {
   resources: readonly CrudResource[];
 };
 
+export type SpaceKind =
+  | "gacha"
+  | "food"
+  | "subscriptions"
+  | "wishlist"
+  | "clothing"
+  | "travel"
+  | "sales"
+  | "projects"
+  | "inspiration";
+
 const statusOptions = {
   project: [
     { label: "Idea", value: "idea" },
