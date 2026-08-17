@@ -87,8 +87,21 @@ function fitCameraToHomeItems(
 }
 
 export function HomeCanvas({ data }: { data: HomeCanvasData }) {
-  const [items, setItems] = useState(data.status === "ready" ? data.items : []);
+  const serverItems = data.status === "ready" ? data.items : null;
+  const [items, setItems] = useState<HomeCanvasItem[]>(() => (data.status === "ready" ? data.items : []));
+  const [syncedServerItems, setSyncedServerItems] = useState(serverItems);
+  if (serverItems !== syncedServerItems) {
+    setSyncedServerItems(serverItems);
+    if (serverItems) setItems(serverItems);
+  }
+
+  const statusMessage =
+    data.status === "error" ? "No se pudieron cargar los elementos del lienzo."
+    : data.status === "unauthenticated" ? "Inicia sesión para ver tu lienzo."
+    : data.status === "unconfigured" ? "Configura Supabase para usar el lienzo."
+    : null;
   const [message, setMessage] = useState<string | null>(null);
+  const activeMessage = message ?? statusMessage;
   const [expandedImage, setExpandedImage] = useState<HomeCanvasItem | null>(null);
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const cameraRef = useRef(camera);
@@ -102,25 +115,16 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const canPersist = data.status === "ready";
   const didFitCameraRef = useRef(false);
-
-  useEffect(() => {
-    if (data.status === "ready") {
-      setItems(data.items);
-      didFitCameraRef.current = false;
-      return;
-    }
-    if (data.status === "error") setMessage("No se pudieron cargar los elementos del lienzo.");
-    if (data.status === "unauthenticated") setMessage("Inicia sesión para ver tu lienzo.");
-    if (data.status === "unconfigured") setMessage("Configura Supabase para usar el lienzo.");
-  }, [data]);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(() => {
     const node = viewportRef.current;
-    if (!node || items.length === 0) return;
+    if (!node || data.status !== "ready" || itemsRef.current.length === 0 || didFitCameraRef.current) return;
 
     const tryFit = () => {
       if (didFitCameraRef.current) return;
-      if (fitCameraToHomeItems(items, node, setCamera, cameraRef)) {
+      if (fitCameraToHomeItems(itemsRef.current, node, setCamera, cameraRef)) {
         didFitCameraRef.current = true;
       }
     };
@@ -129,7 +133,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
     const observer = new ResizeObserver(tryFit);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [items]);
+  }, [data.status, items.length]);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -343,7 +347,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
         </div>
         <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void uploadImage(event.target.files?.[0]); event.target.value = ""; }} ref={imageInput} type="file" />
       </header>
-      {message ? <p className="home-canvas-message" role="status">{message}<button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
+      {activeMessage ? <p className="home-canvas-message" role="status">{activeMessage}<button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <DndContext onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }} onDragMove={keepDraggedItemVisible} onDragStart={() => { const activeCamera = cameraRef.current; didDragRef.current = true; dragCameraStartRef.current = { x: activeCamera.x, y: activeCamera.y }; setDragCameraStart({ x: activeCamera.x, y: activeCamera.y }); }} sensors={sensors}>
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
           {items.map((item) => <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} item={item} key={item.id} onChange={updateItem} onDelete={deleteItem} onDuplicate={() => void duplicateItem(item)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom} />)}

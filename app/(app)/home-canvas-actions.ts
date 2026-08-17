@@ -56,7 +56,6 @@ export async function saveHomeCanvasItem(input: { content: Record<string, unknow
   if (!UUID_PATTERN.test(input.id) || !validPosition(input.positionX) || !validPosition(input.positionY) || !validContent(input.content)) return;
   const { supabase, userId } = await getAuthenticatedClient();
   await supabase.from("home_canvas_items").update({ content: input.content, position_x: input.positionX, position_y: input.positionY }).eq("id", input.id).eq("user_id", userId);
-  revalidatePath("/");
 }
 
 export async function deleteHomeCanvasItem(id: string) {
