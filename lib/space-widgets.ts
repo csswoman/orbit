@@ -116,7 +116,7 @@ function normalizePositions(value: unknown): Record<string, { x: number; y: numb
 }
 
 function isFinitePosition(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+  return typeof value === "number" && Number.isFinite(value) && value >= -1_000_000 && value <= 1_000_000;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

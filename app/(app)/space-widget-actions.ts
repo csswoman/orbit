@@ -20,12 +20,12 @@ function validSpace(space: string) {
   return Boolean(getSpace(space));
 }
 
-export async function createSheetWidget(space: string, title = "Nueva hoja", content = emptyDocument()) {
-  if (!validSpace(space) || !validDocument(content)) return { error: "Hoja no válida." };
+export async function createSheetWidget(space: string, title = "Nueva hoja", content = emptyDocument(), position = { x: 144, y: 96 }) {
+  if (!validSpace(space) || !validDocument(content) || !validPosition(position.x) || !validPosition(position.y)) return { error: "Hoja no válida." };
   const { supabase, userId } = await getAuthenticatedClient();
   const { data, error } = await supabase
     .from("space_widgets")
-    .insert({ content, space_type: space, title: title.trim().slice(0, 120) || "Nueva hoja", user_id: userId })
+    .insert({ content, position_x: position.x, position_y: position.y, space_type: space, title: title.trim().slice(0, 120) || "Nueva hoja", user_id: userId })
     .select("id, title, content, image_path, link_url, position_x, position_y, width, height")
     .single();
 
@@ -149,7 +149,7 @@ export async function duplicateSpaceWidget(space: string, id: string) {
   const { supabase, userId } = await getAuthenticatedClient();
   const { data: source } = await supabase.from("space_widgets").select("widget_type, title, content, image_path, link_url, position_x, position_y, width, height").eq("id", id).eq("space_type", space).eq("user_id", userId).maybeSingle();
   if (!source) return { error: "No se encontró el elemento." };
-  const { data, error } = await supabase.from("space_widgets").insert({ content: source.content, height: source.height, image_path: source.image_path, link_url: source.link_url, position_x: Math.min(92, Number(source.position_x) + 4), position_y: Math.min(92, Number(source.position_y) + 4), space_type: space, title: source.title, user_id: userId, widget_type: source.widget_type, width: source.width }).select("id, widget_type, title, content, image_path, link_url, position_x, position_y, width, height").single();
+  const { data, error } = await supabase.from("space_widgets").insert({ content: source.content, height: source.height, image_path: source.image_path, link_url: source.link_url, position_x: Math.min(1_000_000, Number(source.position_x) + 48), position_y: Math.min(1_000_000, Number(source.position_y) + 48), space_type: space, title: source.title, user_id: userId, widget_type: source.widget_type, width: source.width }).select("id, widget_type, title, content, image_path, link_url, position_x, position_y, width, height").single();
   if (error || !data) return { error: "No se pudo duplicar el elemento." };
   revalidatePath(`/${space}`);
   return { widget: { content: data.content as Record<string, unknown>, height: Number(data.height), id: data.id, imagePath: data.image_path, imageUrl: null, linkUrl: data.link_url, positionX: Number(data.position_x), positionY: Number(data.position_y), title: data.title, type: data.widget_type as "image" | "link" | "sheet", width: Number(data.width) } };
@@ -165,7 +165,7 @@ function validDocument(value: Record<string, unknown>) {
 }
 
 function validPosition(value: number) {
-  return Number.isFinite(value) && value >= 0 && value <= 100;
+  return Number.isFinite(value) && value >= -1_000_000 && value <= 1_000_000;
 }
 
 function isUrl(value: string) {

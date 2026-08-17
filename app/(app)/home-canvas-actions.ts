@@ -16,7 +16,7 @@ async function getAuthenticatedClient() {
 }
 
 function validPosition(value: number) {
-  return Number.isFinite(value) && value >= 0 && value <= 92;
+  return Number.isFinite(value) && value >= -1_000_000 && value <= 1_000_000;
 }
 
 function validContent(value: Record<string, unknown>) {
@@ -71,7 +71,7 @@ export async function duplicateHomeCanvasItem(id: string) {
   const { supabase, userId } = await getAuthenticatedClient();
   const { data: source } = await supabase.from("home_canvas_items").select("kind, content, image_path, position_x, position_y").eq("id", id).eq("user_id", userId).maybeSingle();
   if (!source) return { error: "No se encontró el elemento." };
-  const { data, error } = await supabase.from("home_canvas_items").insert({ content: source.content, image_path: source.image_path, kind: source.kind, position_x: Math.min(92, Number(source.position_x) + 4), position_y: Math.min(92, Number(source.position_y) + 4), user_id: userId }).select("id, kind, content, image_path, position_x, position_y").single();
+  const { data, error } = await supabase.from("home_canvas_items").insert({ content: source.content, image_path: source.image_path, kind: source.kind, position_x: Math.min(1_000_000, Number(source.position_x) + 48), position_y: Math.min(1_000_000, Number(source.position_y) + 48), user_id: userId }).select("id, kind, content, image_path, position_x, position_y").single();
   if (error || !data) return { error: "No se pudo duplicar el elemento." };
   revalidatePath("/");
   return { item: { content: data.content as Record<string, unknown>, id: data.id, imagePath: data.image_path, kind: data.kind as HomeCanvasKind, positionX: Number(data.position_x), positionY: Number(data.position_y) } };

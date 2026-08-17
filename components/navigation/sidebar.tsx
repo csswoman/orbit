@@ -1,4 +1,4 @@
-import { LogOut, Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 
 import { signOut } from "@/app/(app)/actions";
@@ -21,13 +21,6 @@ export function Sidebar() {
       </div>
 
       <div className="mt-5 space-y-1 border-t border-white/10 pt-4">
-        <Link
-          className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--orbit-nav-text)] hover:bg-[var(--orbit-nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
-          href="/settings"
-        >
-          <Settings aria-hidden="true" className="size-[1.125rem]" />
-          Apariencia
-        </Link>
         <form action={signOut}>
           <button
             className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-[var(--orbit-nav-muted)] hover:bg-[var(--orbit-nav-hover)] hover:text-[var(--orbit-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
