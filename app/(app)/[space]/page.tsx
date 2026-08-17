@@ -1,5 +1,10 @@
+import { connection } from "next/server";
 import { notFound } from "next/navigation";
 
+import { SpaceWorkspace } from "@/components/spaces/space-workspace";
+import { getCrudConfig } from "@/lib/space-crud";
+import { getSpaceWorkspace } from "@/lib/space-data";
+import { getSpaceCanvas } from "@/lib/space-widgets";
 import { getSpace, spaces } from "@/lib/spaces";
 
 export function generateStaticParams() {
@@ -13,23 +18,28 @@ export default async function SpacePage({
 }) {
   const { space: slug } = await params;
   const space = getSpace(slug);
+  const config = getCrudConfig(slug);
 
-  if (!space) {
+  if (!space || !config) {
     notFound();
   }
 
+  await connection();
+  const [data, canvas] = await Promise.all([
+    getSpaceWorkspace(slug),
+    getSpaceCanvas(slug),
+  ]);
+
   return (
-    <section className="space-y-4">
-      <p className="text-sm font-medium text-[var(--orbit-accent)]">Space</p>
-      <h1 className="text-3xl font-semibold tracking-[-0.025em]">
-        {space.label}
-      </h1>
-      <div className="max-w-2xl rounded-xl bg-[var(--orbit-surface)] p-6">
-        <p className="leading-7 text-[var(--orbit-muted)]">
-          Este espacio ya forma parte de la navegación. Su CRUD llegará después
-          de revisar el scaffold, la base de datos y el dashboard.
-        </p>
-      </div>
+    <section className="space-page">
+      <SpaceWorkspace
+        config={config}
+        relationOptions={data.relationOptions}
+        resourcesData={data.resources}
+        preference={canvas.preference}
+        space={slug}
+        widgets={canvas.widgets}
+      />
     </section>
   );
 }

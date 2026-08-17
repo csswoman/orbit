@@ -27,7 +27,7 @@ export function DashboardNotice({
       </div>
       {href && linkLabel ? (
         <Link
-          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg bg-[var(--orbit-accent)] px-4 font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)] focus-visible:ring-offset-2"
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg bg-[var(--orbit-accent)] px-4 font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent-strong)]"
           href={href}
         >
           {linkLabel}

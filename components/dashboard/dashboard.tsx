@@ -31,7 +31,7 @@ export async function Dashboard() {
   }
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+    <div className="dashboard-widget-grid">
       <UpcomingSection now={now} state={data.upcoming} />
       <ResurfaceSection now={now} state={data.resurface} />
     </div>

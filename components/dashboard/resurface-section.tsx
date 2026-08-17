@@ -18,7 +18,7 @@ export function ResurfaceSection({
   return (
     <section
       aria-labelledby="resurface-title"
-      className="dashboard-panel overflow-hidden"
+      className="dashboard-panel orbit-widget orbit-widget--resurface overflow-hidden"
     >
       <header className="p-5 pb-4 sm:p-6 sm:pb-5">
         <div className="flex items-center gap-2">

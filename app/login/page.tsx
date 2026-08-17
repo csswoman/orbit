@@ -1,32 +1,35 @@
 import { LoginForm } from "@/components/auth/login-form";
+import { OrbitLogo } from "@/components/brand/orbit-logo";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export default function LoginPage() {
   const configured = isSupabaseConfigured();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-6 py-16 text-zinc-950">
-      <section className="w-full max-w-md space-y-8">
-        <div className="space-y-3">
-          <p className="font-semibold text-indigo-700">Orbit</p>
-          <h1 className="text-3xl font-semibold tracking-tight">
+    <main className="login-page flex min-h-screen min-w-0 items-center justify-center overflow-x-hidden px-6 py-12 sm:py-16">
+      <section className="w-full max-w-[calc(100vw-3rem)] rounded-2xl bg-[var(--orbit-surface)] p-6 sm:max-w-md sm:p-9">
+        <div className="space-y-4">
+          <OrbitLogo className="w-48" preload />
+          <h1 className="orbit-display-title break-words text-3xl font-semibold">
             Tu vida, en una órbita más clara.
           </h1>
-          <p className="max-w-prose leading-7 text-zinc-700">
+          <p className="max-w-prose leading-7 text-[var(--orbit-muted)]">
             Entra para ver lo próximo y volver a encontrar las ideas que habías
             guardado.
           </p>
         </div>
 
         {!configured ? (
-          <div className="rounded-xl bg-indigo-50 p-4 text-sm leading-6 text-indigo-950">
+          <div className="mt-6 rounded-xl bg-[var(--orbit-accent-soft)] p-4 text-sm leading-6">
             Falta conectar Supabase. Copia <code>.env.example</code> como{" "}
             <code>.env.local</code> y completa los dos valores del panel Connect
             de tu proyecto.
           </div>
         ) : null}
 
-        <LoginForm configured={configured} />
+        <div className="mt-8">
+          <LoginForm configured={configured} />
+        </div>
       </section>
     </main>
   );

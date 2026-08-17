@@ -27,7 +27,7 @@ export function UpcomingSection({
   state: UpcomingState;
 }) {
   return (
-    <section aria-labelledby="upcoming-title" className="dashboard-panel p-5 sm:p-6">
+    <section aria-labelledby="upcoming-title" className="dashboard-panel orbit-widget orbit-widget--schedule p-5 sm:p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -36,7 +36,7 @@ export function UpcomingSection({
               className="size-5 text-[var(--orbit-accent)]"
             />
             <h2 id="upcoming-title" className="text-xl font-semibold tracking-[-0.02em]">
-              Upcoming
+              Próximo
             </h2>
           </div>
           <p className="mt-1 text-sm text-[var(--orbit-muted)]">

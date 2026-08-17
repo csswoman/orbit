@@ -10,8 +10,6 @@ export type LoginState = {
   message?: string;
 };
 
-export const initialState: LoginState = {};
-
 export async function signInWithEmail(
   _previousState: LoginState,
   formData: FormData,

@@ -97,7 +97,7 @@ function NavigationLink({
       aria-current={active ? "page" : undefined}
       className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)] ${
         active
-          ? "bg-[var(--orbit-accent)] text-white"
+          ? "orbit-nav-link--active text-white"
           : "text-[var(--orbit-nav-text)] hover:bg-[var(--orbit-nav-hover)]"
       }`}
       href={href}

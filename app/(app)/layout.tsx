@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="min-w-0 flex-1">
         <MobileNavigation />
-        <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+        <main className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           {children}
         </main>
       </div>

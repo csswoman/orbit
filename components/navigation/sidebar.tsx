@@ -1,21 +1,19 @@
-import { LogOut, Orbit, Settings } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 
 import { signOut } from "@/app/(app)/actions";
+import { OrbitLogo } from "@/components/brand/orbit-logo";
 import { NavigationLinks } from "@/components/navigation/navigation-links";
 
 export function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-[17.5rem] shrink-0 flex-col bg-[var(--orbit-sidebar)] px-4 py-5 lg:flex">
+    <aside className="orbit-sidebar sticky top-0 hidden h-screen w-[17.5rem] shrink-0 flex-col px-4 py-5 lg:flex">
       <Link
         aria-label="Ir al inicio de Orbit"
-        className="mb-8 flex min-h-11 items-center gap-3 rounded-lg px-3 text-[var(--orbit-nav-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
+        className="mb-7 flex min-h-16 items-center rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
         href="/"
       >
-        <span className="grid size-9 place-items-center rounded-full bg-[var(--orbit-accent)] text-white">
-          <Orbit aria-hidden="true" className="size-5" />
-        </span>
-        <span className="text-lg font-semibold tracking-[-0.02em]">Orbit</span>
+        <OrbitLogo alt="" className="w-[9.5rem]" preload />
       </Link>
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">

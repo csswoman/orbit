@@ -1,10 +1,11 @@
 "use client";
 
-import { LogOut, Menu, Orbit, Settings, X } from "lucide-react";
+import { LogOut, Menu, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { signOut } from "@/app/(app)/actions";
+import { OrbitLogo } from "@/components/brand/orbit-logo";
 import { NavigationLinks } from "@/components/navigation/navigation-links";
 
 export function MobileNavigation() {
@@ -25,11 +26,11 @@ export function MobileNavigation() {
     <>
       <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-[var(--orbit-line)] bg-[var(--orbit-background)] px-4 lg:hidden">
         <Link
-          className="flex min-h-11 items-center gap-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
+          aria-label="Ir al inicio de Orbit"
+          className="flex min-h-11 items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"
           href="/"
         >
-          <Orbit aria-hidden="true" className="size-5 text-[var(--orbit-accent)]" />
-          Orbit
+          <OrbitLogo alt="" className="w-[6.75rem]" preload />
         </Link>
         <button
           aria-expanded={open}
@@ -55,10 +56,7 @@ export function MobileNavigation() {
             className="relative flex h-full w-[min(21rem,88vw)] flex-col bg-[var(--orbit-sidebar)] p-4 text-[var(--orbit-nav-text)]"
           >
             <div className="mb-6 flex min-h-11 items-center justify-between pl-3">
-              <span className="flex items-center gap-2 font-semibold">
-                <Orbit aria-hidden="true" className="size-5 text-[var(--orbit-accent)]" />
-                Orbit
-              </span>
+              <OrbitLogo className="w-[7.5rem]" />
               <button
                 aria-label="Cerrar navegación"
                 className="grid size-11 place-items-center rounded-lg hover:bg-[var(--orbit-nav-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orbit-accent)]"

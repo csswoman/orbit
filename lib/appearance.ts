@@ -13,12 +13,19 @@ export type Appearance = {
 };
 
 export const defaultAppearance: Appearance = {
-  accentColor: "oklch(0.55 0.16 65.1)",
-  backgroundColor: "oklch(1 0 0)",
+  accentColor: "#6350C9",
+  backgroundColor: "#0A0D1E",
   dashboardBackgroundUrl: null,
-  dashboardOverlay: 0.65,
-  surfaceColor: "oklch(0.97 0.006 65.1)",
-  textColor: "oklch(0.17 0.015 65.1)",
+  dashboardOverlay: 0.72,
+  surfaceColor: "#14182F",
+  textColor: "#F5F4FF",
+};
+
+const legacyDefaultAppearance = {
+  accentColor: "#4F46E5",
+  backgroundColor: "#FAFAFA",
+  surfaceColor: "#FFFFFF",
+  textColor: "#18181B",
 };
 
 export async function getAppearance(): Promise<Appearance> {
@@ -54,7 +61,7 @@ export async function getAppearance(): Promise<Appearance> {
       dashboardBackgroundUrl = data?.signedUrl ?? null;
     }
 
-    return {
+    const savedAppearance = {
       accentColor: preferences.accent_color,
       backgroundColor: preferences.background_color,
       dashboardBackgroundUrl,
@@ -62,6 +69,19 @@ export async function getAppearance(): Promise<Appearance> {
       surfaceColor: preferences.surface_color,
       textColor: preferences.text_color,
     };
+
+    const usesLegacyDefaults = Object.entries(legacyDefaultAppearance).every(
+      ([key, value]) =>
+        savedAppearance[key as keyof typeof legacyDefaultAppearance] === value,
+    );
+
+    return usesLegacyDefaults
+      ? {
+          ...defaultAppearance,
+          dashboardBackgroundUrl,
+          dashboardOverlay: Number(preferences.dashboard_overlay),
+        }
+      : savedAppearance;
   } catch {
     return defaultAppearance;
   }
