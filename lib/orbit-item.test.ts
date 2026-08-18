@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addOrbitChild, assembleTree, defaultSize, documentWithText, dropOrbitItem, patchOrbitItem, type OrbitItem } from "./orbit-item";
+import { addOrbitChild, assembleTree, defaultSize, documentWithText, dropOrbitItem, folderTreeContainsId, patchOrbitItem, type OrbitItem } from "./orbit-item";
 
 function item(partial: Partial<OrbitItem> & Pick<OrbitItem, "id" | "title">): OrbitItem {
   return {
@@ -91,6 +91,20 @@ describe("patchOrbitItem", () => {
     })];
     const next = patchOrbitItem(roots, "b", { checked: true });
     expect(next[0]?.children[0]?.checked).toBe(true);
+  });
+});
+
+describe("folderTreeContainsId", () => {
+  it("finds a nested folder id in the tree", () => {
+    const roots = [item({
+      id: "root",
+      kind: "folder",
+      title: "Raíz",
+      children: [item({ id: "nested", kind: "folder", parentId: "root", title: "Sub" })],
+    })];
+    expect(folderTreeContainsId(roots[0]!, "nested")).toBe(true);
+    expect(folderTreeContainsId(roots[0]!, "root")).toBe(true);
+    expect(folderTreeContainsId(roots[0]!, "missing")).toBe(false);
   });
 });
 

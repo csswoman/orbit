@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from "react";
 
 import { addChildItem, createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveCheckItem, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
+import { shouldClearPendingImageParent } from "@/lib/image-picker";
 import { parentIdForCreate, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
-import { addOrbitChild, documentWithText, dropOrbitItem, findOrbitItem, patchOrbitItem, type OrbitItem, type OrbitItemKind } from "@/lib/orbit-item";
+import { addOrbitChild, documentWithText, dropOrbitItem, findOrbitItem, folderTreeContainsId, patchOrbitItem, type OrbitItem, type OrbitItemKind } from "@/lib/orbit-item";
 import { createClient } from "@/lib/supabase/client";
 
 export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId }: {
@@ -20,9 +21,21 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const imageParentRef = useRef<string | null>(null);
+  const pickerOpenRef = useRef(false);
 
   function clearPendingImageParent() {
     imageParentRef.current = null;
+  }
+
+  function openImagePicker(clearParent = false) {
+    if (clearParent) clearPendingImageParent();
+    pickerOpenRef.current = true;
+    imageInput.current?.click();
+  }
+
+  function finishImagePicker(hasSelectedFile: boolean) {
+    if (shouldClearPendingImageParent(pickerOpenRef.current, hasSelectedFile)) clearPendingImageParent();
+    pickerOpenRef.current = false;
   }
 
   function resolveParent(kind: ItemKind) {
@@ -110,7 +123,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   async function addChild(parentId: string, kind: ItemKind): Promise<"image" | void> {
     if (kind === "image") {
       imageParentRef.current = parentId;
-      imageInput.current?.click();
+      openImagePicker();
       return "image";
     }
     if (kind === "link") {
@@ -132,12 +145,20 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   }
 
   useEffect(() => {
+    function onWindowFocus() {
+      finishImagePicker(Boolean(imageInput.current?.files?.length));
+    }
+    window.addEventListener("focus", onWindowFocus);
+    return () => window.removeEventListener("focus", onWindowFocus);
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && target.matches("input, textarea, [contenteditable='true']")) return;
       if (event.key.toLowerCase() === "n") { event.preventDefault(); void createItem("note"); }
       if (event.key.toLowerCase() === "t") { event.preventDefault(); void createItem("list"); }
-      if (event.key.toLowerCase() === "i") { event.preventDefault(); clearPendingImageParent(); imageInput.current?.click(); }
+      if (event.key.toLowerCase() === "i") { event.preventDefault(); openImagePicker(true); }
     };
     const onPaste = (event: ClipboardEvent) => {
       const target = event.target;
@@ -160,6 +181,10 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     addImage,
     addLink,
     clearPendingImageParent,
+    closeFolder(id: string, parentId: string | null) {
+      if (openFolderId !== id) return;
+      setOpenFolderId(parentId);
+    },
     childAdded(parentId: string, child: OrbitItem) { place(parentId, child); },
     createItem,
     creating,
@@ -169,6 +194,15 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
       place(result.item.parentId, { ...result.item, imageUrl: item.imageUrl });
     },
     editingId,
+    imageInputHandlers: {
+      onCancel: () => finishImagePicker(false),
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        finishImagePicker(Boolean(file));
+        void addImage(file);
+        event.target.value = "";
+      },
+    },
     items,
     message,
     moveItem(id: string, positionX: number, positionY: number) {
@@ -176,10 +210,11 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
       void saveOrbitItemPosition({ id, x: positionX, y: positionY });
     },
     openFolderId,
+    openImagePicker,
     removeItem(item: OrbitItem) {
       if (item.kind === "folder" && item.children.length > 0 && !window.confirm("¿Borrar esta carpeta y todo lo de dentro?")) return;
       setItems((current) => dropOrbitItem(current, item.id));
-      if (openFolderId === item.id) setOpenFolderId(null);
+      if (openFolderId === item.id || (openFolderId && item.kind === "folder" && folderTreeContainsId(item, openFolderId))) setOpenFolderId(null);
       void deleteOrbitItem(item.id);
     },
     saveNote(next: { body: Record<string, unknown>; id: string; title: string }) {

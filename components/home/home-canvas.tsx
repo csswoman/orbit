@@ -162,17 +162,17 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
           <button aria-label="Crear una carpeta" className="canvas-tooltip" data-tooltip="Carpeta" onClick={() => void canvas.createItem("folder")} type="button"><Folder aria-hidden="true" /></button>
           <button aria-label="Crear una lista (T)" className="canvas-tooltip" data-tooltip="Lista · T" onClick={() => void canvas.createItem("list")} type="button"><CheckSquare2 aria-hidden="true" /></button>
           <button aria-label="Crear una nota (N)" className="canvas-tooltip" data-tooltip="Nota · N" onClick={() => void canvas.createItem("note")} type="button"><StickyNote aria-hidden="true" /></button>
-          <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => { canvas.clearPendingImageParent(); imageInput.current?.click(); }} type="button"><ImagePlus aria-hidden="true" /></button>
+          <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => canvas.openImagePicker(true)} type="button"><ImagePlus aria-hidden="true" /></button>
           <button aria-label="Añadir un enlace" className="canvas-tooltip" data-tooltip="Enlace" onClick={() => void canvas.addLink()} type="button"><Link2 aria-hidden="true" /></button>
         </div>
-        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (!file) canvas.clearPendingImageParent(); void canvas.addImage(file); event.target.value = ""; }} ref={imageInput} type="file" />
+        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" {...canvas.imageInputHandlers} ref={imageInput} type="file" />
       </header>
       {canvas.message ? <p className="home-canvas-message" role="status">{canvas.message}<button aria-label="Cerrar mensaje" onClick={() => canvas.setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <DndContext onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }} onDragMove={keepDraggedItemVisible} onDragStart={() => { const activeCamera = cameraRef.current; didDragRef.current = true; dragCameraStartRef.current = { x: activeCamera.x, y: activeCamera.y }; setDragCameraStart({ x: activeCamera.x, y: activeCamera.y }); }} sensors={sensors}>
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
           {rootItems.map((item) => (
             <HomeDragItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={canvas.editingId === item.id} item={item} key={item.id} onDelete={() => canvas.removeItem(item)} onDuplicate={() => void canvas.duplicateItem(item)} onEdit={() => canvas.setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom}>
-              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChildAdded={canvas.childAdded} onCloseFolder={() => canvas.setOpenFolderId(null)} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
+              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
             </HomeDragItem>
           ))}
         </div>

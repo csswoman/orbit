@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ListWidget } from "@/components/items/list-widget";
 import { allowedChildKinds, packingProgress, type ItemKind } from "@/lib/item-nesting";
+import { folderTreeContainsId } from "@/lib/orbit-item";
 import { statusOptionsFor } from "@/lib/item-status";
 import type { OrbitItem } from "@/lib/orbit-item";
 
@@ -17,18 +18,19 @@ const KIND_LABELS: Record<ItemKind, string> = {
   note: "Nota",
 };
 
-export function FolderWidget({ item, open, onOpen, onClose, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded }: {
+export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded }: {
+  activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
   onAddChildTo?: (parentId: string, kind: ItemKind) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
-  onClose: () => void;
-  onOpen: () => void;
+  onCloseFolder: (id: string, parentId: string | null) => void;
+  onOpenFolder: (id: string) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
-  open: boolean;
   spaceKind: string | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const expanded = activeFolderId !== null && (activeFolderId === item.id || folderTreeContainsId(item, activeFolderId));
   const progress = packingProgress(item);
   const statusLabel = statusOptionsFor(spaceKind, "folder").find((option) => option.value === item.status)?.label ?? item.status;
   const kinds = allowedChildKinds({ kind: "folder", parentId: item.parentId });
@@ -36,10 +38,10 @@ export function FolderWidget({ item, open, onOpen, onClose, spaceKind, onAddChil
     ? { backgroundImage: `url("${item.coverUrl.replaceAll('"', "%22")}")` }
     : { background: "var(--orbit-surface)" };
 
-  if (!open) {
+  if (!expanded) {
     return (
       <article className="folder-widget">
-        <button className="folder-widget__body" onClick={onOpen} type="button">
+        <button className="folder-widget__body" onClick={() => onOpenFolder(item.id)} type="button">
           <span className="folder-widget__cover" style={coverStyle} />
           <span className="folder-widget__title">{item.title}</span>
           {spaceKind === "travel" ? (
@@ -54,7 +56,7 @@ export function FolderWidget({ item, open, onOpen, onClose, spaceKind, onAddChil
     <article className="folder-widget is-open" data-no-dnd>
       <header className="folder-widget__header">
         <p className="folder-widget__title">{item.title}</p>
-        <button onClick={onClose} type="button">Cerrar</button>
+        <button onClick={() => onCloseFolder(item.id, item.parentId)} type="button">Cerrar</button>
       </header>
       <ul className="folder-widget__children">
         {item.children.map((child) => (
@@ -68,10 +70,13 @@ export function FolderWidget({ item, open, onOpen, onClose, spaceKind, onAddChil
               <ListWidget item={child} onChildAdded={(added) => onChildAdded?.(child.id, added)} onToggleCheck={onToggleCheck} />
             ) : child.kind === "folder" ? (
               <NestedFolder
+                activeFolderId={activeFolderId}
                 item={child}
                 onAddChild={(kind) => (onAddChildTo ?? ((_parentId, nestedKind) => onAddChild(nestedKind)))(child.id, kind)}
                 onAddChildTo={onAddChildTo}
                 onChildAdded={onChildAdded}
+                onCloseFolder={onCloseFolder}
+                onOpenFolder={onOpenFolder}
                 onToggleCheck={onToggleCheck}
                 spaceKind={spaceKind}
               />
@@ -95,25 +100,27 @@ export function FolderWidget({ item, open, onOpen, onClose, spaceKind, onAddChil
   );
 }
 
-function NestedFolder({ item, spaceKind, onAddChild, onAddChildTo, onChildAdded, onToggleCheck }: {
+function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildTo, onChildAdded, onOpenFolder, onCloseFolder, onToggleCheck }: {
+  activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
   onAddChildTo?: (parentId: string, kind: ItemKind) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
+  onCloseFolder: (id: string, parentId: string | null) => void;
+  onOpenFolder: (id: string) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
   spaceKind: string | null;
 }) {
-  const [open, setOpen] = useState(false);
   return (
     <FolderWidget
+      activeFolderId={activeFolderId}
       item={item}
       onAddChild={onAddChild}
       onAddChildTo={onAddChildTo}
       onChildAdded={onChildAdded}
-      onClose={() => setOpen(false)}
-      onOpen={() => setOpen(true)}
+      onCloseFolder={onCloseFolder}
+      onOpenFolder={onOpenFolder}
       onToggleCheck={onToggleCheck}
-      open={open}
       spaceKind={spaceKind}
     />
   );

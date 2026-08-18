@@ -86,6 +86,11 @@ export function findOrbitItem(items: OrbitItem[], id: string): OrbitItem | null 
   return null;
 }
 
+export function folderTreeContainsId(folder: OrbitItem, itemId: string): boolean {
+  if (folder.id === itemId) return true;
+  return folder.children.some((child) => child.id === itemId || (child.kind === "folder" && folderTreeContainsId(child, itemId)));
+}
+
 export function addOrbitChild(items: OrbitItem[], parentId: string | null, child: OrbitItem): OrbitItem[] {
   if (!parentId) return [...items, child];
   return items.map((item) => {

@@ -14,7 +14,7 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
   item: OrbitItem;
   onAddChild: (parentId: string, kind: ItemKind) => void;
   onChildAdded: (parentId: string, child: OrbitItem) => void;
-  onCloseFolder: () => void;
+  onCloseFolder: (id: string, parentId: string | null) => void;
   onExpandImage?: () => void;
   onOpenFolder: (id: string) => void;
   onSaveNote: (next: { body: Record<string, unknown>; id: string; title: string }) => void;
@@ -25,14 +25,14 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
   if (item.kind === "folder") {
     return (
       <FolderWidget
+        activeFolderId={openFolderId}
         item={item}
         onAddChild={(kind) => onAddChild(item.id, kind)}
         onAddChildTo={onAddChild}
         onChildAdded={onChildAdded}
-        onClose={onCloseFolder}
-        onOpen={() => onOpenFolder(item.id)}
+        onCloseFolder={onCloseFolder}
+        onOpenFolder={onOpenFolder}
         onToggleCheck={onToggleCheck}
-        open={openFolderId === item.id}
         spaceKind={spaceKind}
       />
     );

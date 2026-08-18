@@ -158,11 +158,11 @@ export function SpaceCanvas({ adjustmentContent, children, items: initialItems, 
           <button aria-label="Crear carpeta" className="space-canvas__tool canvas-tooltip" data-tooltip="Carpeta" disabled={canvas.creating} onClick={() => void canvas.createItem("folder")} type="button"><Folder aria-hidden="true" className="size-4" /></button>
           <button aria-label="Crear lista (T)" className="space-canvas__tool canvas-tooltip" data-tooltip="Lista · T" disabled={canvas.creating} onClick={() => void canvas.createItem("list")} type="button"><CheckSquare2 aria-hidden="true" className="size-4" /></button>
           <button aria-label="Crear nota (N)" className="space-canvas__tool canvas-tooltip" data-tooltip={canvas.creating ? "Creando…" : "Nota · N"} disabled={canvas.creating} onClick={() => void canvas.createItem("note")} type="button"><StickyNote aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Añadir imagen (I)" className="space-canvas__tool canvas-tooltip" data-tooltip="Imagen · I" disabled={canvas.creating} onClick={() => { canvas.clearPendingImageParent(); imageInput.current?.click(); }} type="button"><ImagePlus aria-hidden="true" className="size-4" /></button>
+          <button aria-label="Añadir imagen (I)" className="space-canvas__tool canvas-tooltip" data-tooltip="Imagen · I" disabled={canvas.creating} onClick={() => canvas.openImagePicker(true)} type="button"><ImagePlus aria-hidden="true" className="size-4" /></button>
           <button aria-label="Añadir enlace" className="space-canvas__tool canvas-tooltip" data-tooltip="Enlace" disabled={canvas.creating} onClick={() => void canvas.addLink()} type="button"><Link2 aria-hidden="true" className="size-4" /></button>
           <button aria-expanded={adjusting} aria-label="Ajustar canvas" className="space-canvas__adjust canvas-tooltip" data-tooltip="Ajustar" onClick={() => setAdjusting((open) => !open)} type="button"><Settings2 aria-hidden="true" className="size-4" /></button>
         </div>
-        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (!file) canvas.clearPendingImageParent(); void canvas.addImage(file); event.target.value = ""; }} ref={imageInput} type="file" />
+        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" {...canvas.imageInputHandlers} ref={imageInput} type="file" />
       </header>
       {canvas.message ? <p className="home-canvas-message" role="status">{canvas.message}<button aria-label="Cerrar mensaje" onClick={() => canvas.setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <div aria-label="Personalización del space" className="space-canvas__controls" hidden={!adjusting}>
@@ -196,7 +196,7 @@ export function SpaceCanvas({ adjustmentContent, children, items: initialItems, 
                     position={getPosition(id, preference, canvas.items, resourceChildren.length + index)}
                     zoom={camera.zoom}
                   >
-                    <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChildAdded={canvas.childAdded} onCloseFolder={() => canvas.setOpenFolderId(null)} onExpandImage={expandImage} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={spaceDetails.kind} />
+                    <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={expandImage} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={spaceDetails.kind} />
                   </DraggableWidget>
                 );
               })}
