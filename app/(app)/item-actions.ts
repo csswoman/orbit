@@ -33,6 +33,7 @@ async function getOwnedSpace(space: string, userId: string) {
 }
 
 export async function createOrbitItem(input: {
+  body?: Record<string, unknown>;
   dueDate?: string | null;
   imagePath?: string | null;
   kind: OrbitItemKind;
@@ -85,10 +86,16 @@ export async function createOrbitItem(input: {
   const size = defaultSize(input.kind);
   const title = resolveTitle(input);
   const url = input.kind === "link" && input.url ? input.url.trim() : null;
+  const noteBody =
+    input.kind === "note"
+      ? input.body && validDocument(input.body)
+        ? input.body
+        : emptyDocument()
+      : {};
   const { data, error } = await supabase
     .from("orbit_items")
     .insert({
-      body: input.kind === "note" ? emptyDocument() : {},
+      body: noteBody,
       due_date: input.kind === "countdown" ? input.dueDate : input.dueDate ?? null,
       height: size.height || 80,
       image_path: input.kind === "image" ? input.imagePath : null,

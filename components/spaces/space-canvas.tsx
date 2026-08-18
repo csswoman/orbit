@@ -215,11 +215,10 @@ export function SpaceCanvas({ adjustmentContent, children, items: initialItems, 
       if (result.item) setItems((current) => [...current, result.item!]);
       return;
     }
-    const result = await createOrbitItem({ kind: "note", spaceId: space, title: "Texto", x: position.x, y: position.y });
-    if (!result.item) return;
     const body = documentWithText(text);
-    setItems((current) => [...current, { ...result.item!, body, positionX: position.x, positionY: position.y }]);
-    void saveOrbitNote({ body, id: result.item.id, title: result.item.title });
+    const result = await createOrbitItem({ body, kind: "note", spaceId: space, title: "Texto", x: position.x, y: position.y });
+    if (!result.item) return;
+    setItems((current) => [...current, { ...result.item!, positionX: position.x, positionY: position.y }]);
   }
 
   async function addImage(file?: File) {

@@ -243,11 +243,10 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
       setItems((current) => [...current, result.item!]);
       return;
     }
-    const result = await createOrbitItem({ kind: "note", spaceId: null, title: "Texto", x: position.x, y: position.y });
-    if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
     const body = documentWithText(text);
-    setItems((current) => [...current, { ...result.item!, body }]);
-    void saveOrbitNote({ body, id: result.item.id, title: result.item.title });
+    const result = await createOrbitItem({ body, kind: "note", spaceId: null, title: "Texto", x: position.x, y: position.y });
+    if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
+    setItems((current) => [...current, result.item!]);
   }
 
   async function uploadImage(file?: File) {
