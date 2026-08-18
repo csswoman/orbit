@@ -3,6 +3,7 @@
 
 import { Copy, Edit3, Expand, Trash2 } from "lucide-react";
 
+import { CountdownWidget } from "@/components/items/countdown-widget";
 import { FolderWidget } from "@/components/items/folder-widget";
 import { LinkCard } from "@/components/items/link-card";
 import { ListWidget } from "@/components/items/list-widget";
@@ -35,6 +36,7 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
         onChangeCover={onChangeCover}
         onChildAdded={onChildAdded}
         onCloseFolder={onCloseFolder}
+        onItemUpdated={onItemUpdated}
         onOpenFolder={onOpenFolder}
         onToggleCheck={onToggleCheck}
         spaceKind={spaceKind}
@@ -53,15 +55,10 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
     );
   }
   if (item.kind === "link" && item.url) {
-    return <LinkCard item={item} onUpdated={onItemUpdated} />;
+    return <LinkCard item={item} onUpdated={onItemUpdated} spaceKind={spaceKind} />;
   }
-  if (item.kind === "countdown") {
-    return (
-      <article className="countdown-widget">
-        <p>{item.title}</p>
-        <time dateTime={item.dueDate ?? undefined}>{item.dueDate}</time>
-      </article>
-    );
+  if (item.kind === "countdown" && item.dueDate) {
+    return <CountdownWidget dueDate={item.dueDate} title={item.title} />;
   }
   return null;
 }

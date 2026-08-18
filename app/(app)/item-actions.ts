@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { syncOrbitDeadline } from "@/lib/item-deadlines";
 import { canCreateChild, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
 import { applyOrbitLinkPreview, fetchOg, type OgPreview } from "@/lib/link-preview";
@@ -114,8 +115,16 @@ export async function createOrbitItem(input: {
     .single();
 
   if (error || !data) return { error: "No se pudo crear el elemento." };
+  const item = mapOrbitItemRow(data as OrbitItemRow);
+  if (item.dueDate) {
+    try {
+      await syncOrbitDeadline(supabase, userId, { dueDate: item.dueDate, id: item.id, title: item.title });
+    } catch (cause) {
+      console.error("Orbit deadline sync failed", cause);
+    }
+  }
   revalidateItemPath(input.spaceId);
-  return { item: mapOrbitItemRow(data as OrbitItemRow) };
+  return { item };
 }
 
 export async function saveOrbitItemPosition(input: { id: string; x: number; y: number }): Promise<void> {
@@ -185,12 +194,96 @@ export async function saveOrbitNote(input: { body: Record<string, unknown>; id: 
   if (data) revalidateItemPath(data.space_id);
 }
 
+export async function saveOrbitFields(input: {
+  dueDate?: string | null;
+  id: string;
+  price?: number | null;
+  status?: string | null;
+  title?: string;
+}): Promise<{ error?: string; item?: OrbitItem }> {
+  if (!UUID_PATTERN.test(input.id)) return { error: "Elemento no válido." };
+  const { supabase, userId } = await getAuthenticatedClient();
+  const patch: Record<string, unknown> = {};
+  if ("dueDate" in input) {
+    if (input.dueDate !== null && (!input.dueDate || !validIsoDate(input.dueDate))) {
+      return { error: "Fecha no válida." };
+    }
+    patch.due_date = input.dueDate;
+  }
+  if ("price" in input) {
+    if (input.price !== null && !Number.isFinite(input.price)) return { error: "Precio no válido." };
+    patch.price = input.price;
+  }
+  if ("status" in input) patch.status = input.status;
+  if (input.title !== undefined) {
+    const title = input.title.trim().slice(0, 120);
+    if (title) patch.title = title;
+  }
+  if (Object.keys(patch).length === 0) return { error: "Elemento no válido." };
+
+  const { data, error } = await supabase
+    .from("orbit_items")
+    .update(patch)
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) return { error: "No se pudo guardar el elemento." };
+
+  const row = data as OrbitItemRow;
+  const item = mapOrbitItemRow(row, {
+    coverUrl: await signCanvasPath(supabase, row.cover_path),
+    imageUrl: await signCanvasPath(supabase, row.image_path),
+    ogImageUrl: await signCanvasPath(supabase, row.og_image_path),
+  });
+
+  if ("dueDate" in input) {
+    try {
+      await syncOrbitDeadline(supabase, userId, { dueDate: item.dueDate, id: item.id, title: item.title });
+    } catch (cause) {
+      console.error("Orbit deadline sync failed", cause);
+    }
+  }
+
+  revalidateItemPath(row.space_id);
+  return { item };
+}
+
 export async function deleteOrbitItem(id: string): Promise<void> {
   if (!UUID_PATTERN.test(id)) return;
   const { supabase, userId } = await getAuthenticatedClient();
-  const { data } = await supabase.from("orbit_items").select("space_id").eq("id", id).eq("user_id", userId).maybeSingle();
+  const { data: root } = await supabase
+    .from("orbit_items")
+    .select("id, space_id, cover_path, image_path, og_image_path")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!root) return;
+
+  const { data: children } = await supabase
+    .from("orbit_items")
+    .select("id, cover_path, image_path, og_image_path")
+    .eq("parent_id", id)
+    .eq("user_id", userId);
+  const childIds = (children ?? []).map((row) => String(row.id));
+  const { data: grandchildren } = childIds.length
+    ? await supabase
+        .from("orbit_items")
+        .select("id, cover_path, image_path, og_image_path")
+        .in("parent_id", childIds)
+        .eq("user_id", userId)
+    : { data: [] };
+
+  const rows = [root, ...(children ?? []), ...(grandchildren ?? [])];
+  const ids = rows.map((row) => String(row.id));
+  const paths = rows
+    .flatMap((row) => [row.cover_path, row.image_path, row.og_image_path])
+    .filter((path): path is string => Boolean(path));
+
+  await supabase.from("deadlines").delete().eq("space_type", "orbit_item").eq("user_id", userId).in("source_id", ids);
+  if (paths.length) await supabase.storage.from("orbit-canvas").remove(paths);
   await supabase.from("orbit_items").delete().eq("id", id).eq("user_id", userId);
-  revalidateItemPath(data?.space_id ?? null);
+  revalidateItemPath(root.space_id);
 }
 
 export async function saveOrbitCover(input: {
@@ -318,4 +411,13 @@ function validIsoDate(value: string) {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+async function signCanvasPath(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  path: string | null,
+) {
+  if (!path) return null;
+  const { data } = await supabase.storage.from("orbit-canvas").createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? null;
 }

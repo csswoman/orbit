@@ -5,12 +5,14 @@ import { useState, type MouseEvent } from "react";
 import { Link2 } from "lucide-react";
 
 import { retryLinkPreview } from "@/app/(app)/item-actions";
+import { ItemStatusFields } from "@/components/items/item-status-fields";
 import { linkTitleFromUrl } from "@/lib/item-url";
 import type { OrbitItem } from "@/lib/orbit-item";
 
-export function LinkCard({ item, onUpdated }: {
+export function LinkCard({ item, onUpdated, spaceKind }: {
   item: OrbitItem;
   onUpdated?: (item: OrbitItem) => void;
+  spaceKind: string | null;
 }) {
   const [pending, setPending] = useState(false);
   const image = item.coverUrl ?? item.ogImageUrl;
@@ -56,6 +58,7 @@ export function LinkCard({ item, onUpdated }: {
           Reintentar
         </button>
       ) : null}
+      <ItemStatusFields item={item} onUpdated={onUpdated} spaceKind={spaceKind} />
     </div>
   );
 }

@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 
+import { CountdownWidget } from "@/components/items/countdown-widget";
+import { ItemStatusFields } from "@/components/items/item-status-fields";
+import { LinkCard } from "@/components/items/link-card";
 import { ListWidget } from "@/components/items/list-widget";
 import { allowedChildKinds, packingProgress, type ItemKind } from "@/lib/item-nesting";
-import { folderTreeContainsId } from "@/lib/orbit-item";
 import { statusOptionsFor } from "@/lib/item-status";
-import type { OrbitItem } from "@/lib/orbit-item";
+import { folderTreeContainsId, type OrbitItem } from "@/lib/orbit-item";
 
 const KIND_LABELS: Record<ItemKind, string> = {
   check_item: "Ítem",
@@ -18,7 +20,7 @@ const KIND_LABELS: Record<ItemKind, string> = {
   note: "Nota",
 };
 
-export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder, onChangeCover, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded }: {
+export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder, onChangeCover, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded, onItemUpdated }: {
   activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
@@ -26,6 +28,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
   onChangeCover?: (id: string) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
+  onItemUpdated?: (item: OrbitItem) => void;
   onOpenFolder: (id: string) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
   spaceKind: string | null;
@@ -38,6 +41,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
   const coverStyle = item.coverUrl
     ? { backgroundImage: `url("${item.coverUrl.replaceAll('"', "%22")}")` }
     : { background: "var(--orbit-surface)" };
+  const collapsedMeta = collapsedFolderMeta(spaceKind, progress, statusLabel, item.price);
 
   if (!expanded) {
     return (
@@ -45,9 +49,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
         <button className="folder-widget__body" onClick={() => onOpenFolder(item.id)} type="button">
           <span className="folder-widget__cover" style={coverStyle} />
           <span className="folder-widget__title">{item.title}</span>
-          {spaceKind === "travel" ? (
-            <span className="folder-widget__meta">{progress.done}/{progress.total}{statusLabel ? ` · ${statusLabel}` : ""}</span>
-          ) : null}
+          {collapsedMeta ? <span className="folder-widget__meta">{collapsedMeta}</span> : null}
         </button>
       </article>
     );
@@ -64,6 +66,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
           <button onClick={() => onCloseFolder(item.id, item.parentId)} type="button">Cerrar</button>
         </div>
       </header>
+      <ItemStatusFields item={item} onUpdated={onItemUpdated} spaceKind={spaceKind} />
       <ul className="folder-widget__children">
         {item.children.map((child) => (
           <li key={child.id}>
@@ -83,12 +86,17 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
                 onChangeCover={onChangeCover}
                 onChildAdded={onChildAdded}
                 onCloseFolder={onCloseFolder}
+                onItemUpdated={onItemUpdated}
                 onOpenFolder={onOpenFolder}
                 onToggleCheck={onToggleCheck}
                 spaceKind={spaceKind}
               />
+            ) : child.kind === "link" && child.url ? (
+              <LinkCard item={child} onUpdated={onItemUpdated} spaceKind={spaceKind} />
+            ) : child.kind === "countdown" && child.dueDate ? (
+              <CountdownWidget dueDate={child.dueDate} title={child.title} />
             ) : (
-              <p className="folder-widget__child">{child.title}{child.kind === "countdown" && child.dueDate ? ` · ${child.dueDate}` : ""}</p>
+              <p className="folder-widget__child">{child.title}</p>
             )}
           </li>
         ))}
@@ -107,7 +115,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
   );
 }
 
-function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildTo, onChangeCover, onChildAdded, onOpenFolder, onCloseFolder, onToggleCheck }: {
+function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildTo, onChangeCover, onChildAdded, onItemUpdated, onOpenFolder, onCloseFolder, onToggleCheck }: {
   activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
@@ -115,6 +123,7 @@ function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildT
   onChangeCover?: (id: string) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
+  onItemUpdated?: (item: OrbitItem) => void;
   onOpenFolder: (id: string) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
   spaceKind: string | null;
@@ -128,9 +137,26 @@ function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildT
       onChangeCover={onChangeCover}
       onChildAdded={onChildAdded}
       onCloseFolder={onCloseFolder}
+      onItemUpdated={onItemUpdated}
       onOpenFolder={onOpenFolder}
       onToggleCheck={onToggleCheck}
       spaceKind={spaceKind}
     />
   );
+}
+
+function collapsedFolderMeta(
+  spaceKind: string | null,
+  progress: { done: number; total: number },
+  statusLabel: string | null,
+  price: number | null,
+) {
+  if (spaceKind === "travel") {
+    return `${progress.done}/${progress.total}${statusLabel ? ` · ${statusLabel}` : ""}`;
+  }
+  if (spaceKind === "sales") {
+    const bits = [price == null ? null : String(price), statusLabel].filter(Boolean);
+    return bits.length ? bits.join(" · ") : null;
+  }
+  return statusLabel || null;
 }

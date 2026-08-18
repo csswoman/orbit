@@ -16,6 +16,7 @@ type UpcomingState =
 const sourceMeta = {
   food_item: { icon: Apple, label: "Comida" },
   gacha_event: { icon: Gamepad2, label: "Gacha" },
+  orbit_item: { icon: CalendarClock, label: "Orbit" },
   subscription: { icon: Repeat2, label: "Suscripción" },
 };
 

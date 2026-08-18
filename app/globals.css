@@ -1350,7 +1350,17 @@ kbd { border: 1px solid color-mix(in oklch, currentColor 28%, transparent); bord
 .folder-widget__kinds { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.45rem; }
 .folder-widget__kinds button { border: 0; border-radius: 6px; padding: 0.2rem 0.5rem; color: inherit; background: color-mix(in oklch, var(--orbit-pearl) 18%, transparent); cursor: pointer; }
 .list-widget__add input { width: 100%; border: 0; border-bottom: 1px solid color-mix(in oklch, var(--orbit-pearl) 35%, transparent); padding: 0.35rem 0; color: inherit; outline: 0; background: transparent; }
-.countdown-widget time { display: block; margin-top: 0.35rem; color: var(--orbit-muted); font-size: 0.85rem; }
+.countdown-widget time { display: block; margin-top: 0.35rem; color: var(--orbit-muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.item-status-fields { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem; }
+.item-status-fields label { display: grid; gap: 0.15rem; color: var(--orbit-muted); font-size: 0.72rem; }
+.item-status-fields input, .item-status-fields select {
+  min-width: 7rem;
+  border: 1px solid color-mix(in oklch, var(--orbit-pearl) 35%, transparent);
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  color: var(--orbit-text);
+  background: color-mix(in oklch, var(--orbit-background) 70%, transparent);
+}
 .space-canvas[data-layout="free"] .space-canvas__widget:has(.folder-widget) { width: min(16rem, 32%); }
 .space-canvas[data-layout="free"] .space-canvas__widget:has(.folder-widget.is-open),
 .space-canvas[data-layout="free"] .space-canvas__widget:has(.list-widget) { width: min(24rem, 40%); }
