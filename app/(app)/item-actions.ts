@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { clonedMediaPath, clonedOgPath } from "@/lib/canvas-clone-path";
 import { syncOrbitDeadline } from "@/lib/item-deadlines";
 import { canCreateChild, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
@@ -166,9 +167,21 @@ export async function saveItemTitle(input: { id: string; title: string }): Promi
     .update({ title })
     .eq("id", input.id)
     .eq("user_id", userId)
-    .select("space_id")
+    .select("space_id, due_date")
     .maybeSingle();
-  if (data) revalidateItemPath(data.space_id);
+  if (!data) return;
+  if (data.due_date) {
+    try {
+      await syncOrbitDeadline(supabase, userId, {
+        dueDate: String(data.due_date),
+        id: input.id,
+        title,
+      });
+    } catch (cause) {
+      console.error("Orbit deadline sync failed", cause);
+    }
+  }
+  revalidateItemPath(data.space_id);
 }
 
 export async function addChildItem(input: {
@@ -189,9 +202,21 @@ export async function saveOrbitNote(input: { body: Record<string, unknown>; id: 
     .update({ body: input.body, title })
     .eq("id", input.id)
     .eq("user_id", userId)
-    .select("space_id")
+    .select("space_id, due_date")
     .maybeSingle();
-  if (data) revalidateItemPath(data.space_id);
+  if (!data) return;
+  if (data.due_date) {
+    try {
+      await syncOrbitDeadline(supabase, userId, {
+        dueDate: String(data.due_date),
+        id: input.id,
+        title,
+      });
+    } catch (cause) {
+      console.error("Orbit deadline sync failed", cause);
+    }
+  }
+  revalidateItemPath(data.space_id);
 }
 
 export async function saveOrbitFields(input: {
@@ -237,7 +262,7 @@ export async function saveOrbitFields(input: {
     ogImageUrl: await signCanvasPath(supabase, row.og_image_path),
   });
 
-  if ("dueDate" in input) {
+  if ("dueDate" in input || (input.title !== undefined && item.dueDate)) {
     try {
       await syncOrbitDeadline(supabase, userId, { dueDate: item.dueDate, id: item.id, title: item.title });
     } catch (cause) {
@@ -336,6 +361,9 @@ export async function duplicateOrbitItem(id: string): Promise<{ error?: string; 
       height: Number(row.height),
       image_path: row.image_path,
       kind: row.kind,
+      og_description: row.og_description,
+      og_image_path: row.og_image_path,
+      og_title: row.og_title,
       parent_id: row.parent_id,
       position_x: Math.min(1_000_000, Number(row.position_x) + 48),
       position_y: Math.min(1_000_000, Number(row.position_y) + 48),
@@ -351,7 +379,40 @@ export async function duplicateOrbitItem(id: string): Promise<{ error?: string; 
     .select("*")
     .single();
   if (error || !data) return { error: "No se pudo duplicar el elemento." };
-  const item = mapOrbitItemRow(data as OrbitItemRow);
+
+  const cloneId = String(data.id);
+  const media = {
+    cover_path: row.cover_path
+      ? await copyCanvasObject(
+          supabase,
+          row.cover_path,
+          clonedMediaPath(userId, crypto.randomUUID(), row.cover_path),
+        )
+      : null,
+    image_path: row.image_path
+      ? await copyCanvasObject(
+          supabase,
+          row.image_path,
+          clonedMediaPath(userId, crypto.randomUUID(), row.image_path),
+        )
+      : null,
+    og_image_path: row.og_image_path
+      ? await copyCanvasObject(supabase, row.og_image_path, clonedOgPath(userId, cloneId))
+      : null,
+  };
+  const { data: copied } = await supabase
+    .from("orbit_items")
+    .update(media)
+    .eq("id", cloneId)
+    .eq("user_id", userId)
+    .select("*")
+    .maybeSingle();
+  const clone = (copied ?? { ...data, ...media }) as OrbitItemRow;
+  const item = mapOrbitItemRow(clone, {
+    coverUrl: await signCanvasPath(supabase, clone.cover_path),
+    imageUrl: await signCanvasPath(supabase, clone.image_path),
+    ogImageUrl: await signCanvasPath(supabase, clone.og_image_path),
+  });
   if (item.dueDate) {
     try {
       await syncOrbitDeadline(supabase, userId, { dueDate: item.dueDate, id: item.id, title: item.title });
@@ -428,4 +489,14 @@ async function signCanvasPath(
   if (!path) return null;
   const { data } = await supabase.storage.from("orbit-canvas").createSignedUrl(path, 60 * 60);
   return data?.signedUrl ?? null;
+}
+
+async function copyCanvasObject(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourcePath: string,
+  destPath: string,
+) {
+  const { error } = await supabase.storage.from("orbit-canvas").copy(sourcePath, destPath);
+  if (error) return null;
+  return destPath;
 }

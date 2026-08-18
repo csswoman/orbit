@@ -74,7 +74,7 @@ export function ResourceForm({
               key={field.key}
               onImageUploadingChange={setImageUploading}
               relationOptions={relationOptions}
-              resetKey={mode === "create" ? state.resetKey : undefined}
+              resetKey={state.resetKey}
             />
           ))}
       </div>

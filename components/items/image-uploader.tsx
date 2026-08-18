@@ -5,6 +5,10 @@ import { ImagePlus, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
+  shouldDeletePendingUpload,
+  shouldReleasePendingUpload,
+} from "@/lib/pending-upload";
+import {
   CANVAS_BUCKET,
   deleteCanvasImage,
   uploadCanvasImage,
@@ -31,6 +35,8 @@ export function ImageUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blobUrlRef = useRef<string | null>(null);
   const pendingPathRef = useRef<string | null>(null);
+  const initialPathRef = useRef(initialPath);
+  initialPathRef.current = initialPath;
   const [path, setPath] = useState(initialPath ? String(initialPath) : "");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -39,6 +45,12 @@ export function ImageUploader({
   useEffect(() => {
     onUploadingChange?.(uploading);
   }, [onUploadingChange, uploading]);
+
+  useEffect(() => {
+    if (shouldReleasePendingUpload(pendingPathRef.current, initialPath)) {
+      pendingPathRef.current = null;
+    }
+  }, [initialPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,22 +85,26 @@ export function ImageUploader({
     if (resetKey === undefined) return;
 
     pendingPathRef.current = null;
+    setError(null);
+    if (initialPath) return;
+
     if (blobUrlRef.current?.startsWith("blob:")) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
     setPath("");
     setPreviewUrl(null);
-    setError(null);
     onPathChange?.(null);
-  }, [onPathChange, resetKey]);
+  }, [initialPath, onPathChange, resetKey]);
 
   useEffect(() => {
     return () => {
       if (blobUrlRef.current?.startsWith("blob:")) {
         URL.revokeObjectURL(blobUrlRef.current);
       }
-      void deleteCanvasImage(pendingPathRef.current);
+      if (shouldDeletePendingUpload(pendingPathRef.current, initialPathRef.current)) {
+        void deleteCanvasImage(pendingPathRef.current);
+      }
     };
   }, []);
 
