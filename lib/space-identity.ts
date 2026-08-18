@@ -4,6 +4,7 @@ export type SpaceFontId = "classic" | "grotesk" | "soft";
 
 export const SPACE_ICON_IDS = [
   "apple",
+  "briefcase",
   "folder-kanban",
   "gamepad",
   "heart",
@@ -18,6 +19,7 @@ export type SpaceIconId = (typeof SPACE_ICON_IDS)[number];
 
 export const SPACE_ICON_LABELS: Record<SpaceIconId, string> = {
   apple: "Comida",
+  briefcase: "Trabajo",
   "folder-kanban": "Proyectos",
   gamepad: "Juegos",
   heart: "Deseos",
@@ -52,6 +54,7 @@ const defaultAccents: Record<SpaceKind, string> = {
   food: "#e8a07a",
   gacha: "#9388ff",
   inspiration: "#edf0ff",
+  jobs: "#c4a574",
   projects: "#a99bff",
   sales: "#f0c36a",
   subscriptions: "#6ea8ff",

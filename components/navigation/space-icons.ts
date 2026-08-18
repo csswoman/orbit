@@ -1,5 +1,6 @@
 import {
   Apple,
+  Briefcase,
   FolderKanban,
   Gamepad2,
   Heart,
@@ -15,6 +16,7 @@ import type { SpaceIconId } from "@/lib/space-identity";
 
 export const spaceIcons: Record<SpaceIconId, LucideIcon> = {
   apple: Apple,
+  briefcase: Briefcase,
   "folder-kanban": FolderKanban,
   gamepad: Gamepad2,
   heart: Heart,

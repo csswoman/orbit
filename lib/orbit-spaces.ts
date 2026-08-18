@@ -28,6 +28,7 @@ export const prebuiltSpaces = [
   { icon: "shirt", kind: "clothing", name: "Ropa", position: 50 },
   { icon: "luggage", kind: "travel", name: "Viajes", position: 60 },
   { icon: "tag", kind: "sales", name: "Ventas", position: 70 },
+  { icon: "briefcase", kind: "jobs", name: "Trabajo", position: 75 },
   { icon: "folder-kanban", kind: "projects", name: "Proyectos", position: 80 },
   { icon: "sparkles", kind: "inspiration", name: "Inspiración", position: 90 },
 ] as const satisfies ReadonlyArray<Omit<OrbitSpace, "accentColor" | "backgroundImageUrl" | "backgroundOverlay" | "iconImageUrl" | "id" | "isPrebuilt">>;
