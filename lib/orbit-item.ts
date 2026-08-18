@@ -66,6 +66,51 @@ export function emptyDocument(): Record<string, unknown> {
   return { content: [{ type: "paragraph" }], type: "doc" };
 }
 
+export function documentWithText(text: string): Record<string, unknown> {
+  return {
+    content: text
+      .slice(0, 5000)
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => ({ content: [{ text: line, type: "text" }], type: "paragraph" })),
+    type: "doc",
+  };
+}
+
+export function findOrbitItem(items: OrbitItem[], id: string): OrbitItem | null {
+  for (const item of items) {
+    if (item.id === id) return item;
+    const nested = findOrbitItem(item.children, id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+export function addOrbitChild(items: OrbitItem[], parentId: string | null, child: OrbitItem): OrbitItem[] {
+  if (!parentId) return [...items, child];
+  return items.map((item) => {
+    if (item.id === parentId) return { ...item, children: [...item.children, child] };
+    return { ...item, children: addOrbitChild(item.children, parentId, child) };
+  });
+}
+
+export function patchOrbitItem(items: OrbitItem[], id: string, patch: Partial<OrbitItem>): OrbitItem[] {
+  return items.map((item) => {
+    if (item.id === id) return { ...item, ...patch, children: item.children };
+    return { ...item, children: patchOrbitItem(item.children, id, patch) };
+  });
+}
+
+export function dropOrbitItem(items: OrbitItem[], id: string): OrbitItem[] {
+  return items
+    .filter((item) => item.id !== id)
+    .map((item) => ({ ...item, children: dropOrbitItem(item.children, id) }));
+}
+
+export function clampCanvas(value: number) {
+  return Math.min(1_000_000, Math.max(-1_000_000, Math.round(value * 100) / 100));
+}
+
 export function defaultSize(kind: OrbitItemKind): { width: number; height: number } {
   switch (kind) {
     case "folder":

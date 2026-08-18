@@ -1,0 +1,85 @@
+"use client";
+/* eslint-disable @next/next/no-img-element -- signed, user-uploaded URLs cannot be declared as fixed Next image hosts. */
+
+import { Copy, Edit3, Expand, Link2, Trash2 } from "lucide-react";
+
+import { FolderWidget } from "@/components/items/folder-widget";
+import { ListWidget } from "@/components/items/list-widget";
+import { SheetWidget } from "@/components/spaces/sheet-widget";
+import type { ItemKind } from "@/lib/item-nesting";
+import type { OrbitItem } from "@/lib/orbit-item";
+
+export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpenFolder, onCloseFolder, onAddChild, onToggleCheck, onChildAdded, onSaveNote, onExpandImage }: {
+  editing: boolean;
+  item: OrbitItem;
+  onAddChild: (parentId: string, kind: ItemKind) => void;
+  onChildAdded: (parentId: string, child: OrbitItem) => void;
+  onCloseFolder: () => void;
+  onExpandImage?: () => void;
+  onOpenFolder: (id: string) => void;
+  onSaveNote: (next: { body: Record<string, unknown>; id: string; title: string }) => void;
+  onToggleCheck: (id: string, checked: boolean) => void;
+  openFolderId: string | null;
+  spaceKind: string | null;
+}) {
+  if (item.kind === "folder") {
+    return (
+      <FolderWidget
+        item={item}
+        onAddChild={(kind) => onAddChild(item.id, kind)}
+        onAddChildTo={onAddChild}
+        onChildAdded={onChildAdded}
+        onClose={onCloseFolder}
+        onOpen={() => onOpenFolder(item.id)}
+        onToggleCheck={onToggleCheck}
+        open={openFolderId === item.id}
+        spaceKind={spaceKind}
+      />
+    );
+  }
+  if (item.kind === "list") {
+    return <ListWidget item={item} onChildAdded={(child) => onChildAdded(item.id, child)} onToggleCheck={onToggleCheck} />;
+  }
+  if (item.kind === "note") return <SheetWidget editing={editing} item={item} onSave={onSaveNote} />;
+  if (item.kind === "image") {
+    return (
+      <article className="space-image-widget">
+        <img alt={item.title || "Imagen"} draggable={false} onClick={onExpandImage} src={item.imageUrl ?? ""} />
+      </article>
+    );
+  }
+  if (item.kind === "link" && item.url) {
+    return (
+      <a className="space-link-widget" href={item.url} rel="noreferrer" target="_blank">
+        <Link2 aria-hidden="true" />
+        <span><strong>{item.title}</strong><small>{item.url}</small></span>
+      </a>
+    );
+  }
+  if (item.kind === "countdown") {
+    return (
+      <article className="countdown-widget">
+        <p>{item.title}</p>
+        <time dateTime={item.dueDate ?? undefined}>{item.dueDate}</time>
+      </article>
+    );
+  }
+  return null;
+}
+
+export function WidgetControls({ editing, onDelete, onDuplicate, onEdit, onExpand }: {
+  editing: boolean;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onEdit?: () => void;
+  onExpand?: () => void;
+}) {
+  return (
+    <div className="canvas-element-controls" data-no-dnd>
+      {onEdit ? <button aria-label="Editar" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button> : null}
+      {onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}
+      <button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button>
+      <button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button>
+    </div>
+  );
+}

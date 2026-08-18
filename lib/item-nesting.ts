@@ -22,6 +22,19 @@ export function canCreateChild(parent: NestingParent, childKind: ItemKind): bool
   return false;
 }
 
+export function allowedChildKinds(parent: NestingParent): ItemKind[] {
+  const kinds: ItemKind[] = ["folder", "list", "check_item", "note", "image", "link", "countdown"];
+  return kinds.filter((kind) => canCreateChild(parent, kind));
+}
+
+export function parentIdForCreate(
+  openFolder: { id: string; kind: ItemKind; parentId: string | null } | null,
+  kind: ItemKind,
+): string | null {
+  if (!openFolder) return null;
+  return canCreateChild({ kind: openFolder.kind, parentId: openFolder.parentId }, kind) ? openFolder.id : null;
+}
+
 export type ProgressNode = {
   kind: ItemKind | string;
   checked?: boolean;

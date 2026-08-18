@@ -130,6 +130,46 @@ export async function saveOrbitItemPosition(input: { id: string; x: number; y: n
   if (data) revalidateItemPath(data.space_id);
 }
 
+export async function saveCheckItem(input: { checked: boolean; id: string; title?: string }): Promise<void> {
+  if (!UUID_PATTERN.test(input.id)) return;
+  const { supabase, userId } = await getAuthenticatedClient();
+  const patch: Record<string, unknown> = { checked: input.checked };
+  if (input.title !== undefined) patch.title = input.title.trim().slice(0, 120) || "Ítem";
+  const { data } = await supabase
+    .from("orbit_items")
+    .update(patch)
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .eq("kind", "check_item")
+    .select("space_id")
+    .maybeSingle();
+  if (data) revalidateItemPath(data.space_id);
+}
+
+export async function saveItemTitle(input: { id: string; title: string }): Promise<void> {
+  if (!UUID_PATTERN.test(input.id)) return;
+  const title = input.title.trim().slice(0, 120);
+  if (!title) return;
+  const { supabase, userId } = await getAuthenticatedClient();
+  const { data } = await supabase
+    .from("orbit_items")
+    .update({ title })
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .select("space_id")
+    .maybeSingle();
+  if (data) revalidateItemPath(data.space_id);
+}
+
+export async function addChildItem(input: {
+  kind: OrbitItemKind;
+  parentId: string;
+  spaceId: string | null;
+  title?: string;
+}): Promise<{ error?: string; item?: OrbitItem }> {
+  return createOrbitItem({ kind: input.kind, parentId: input.parentId, spaceId: input.spaceId, title: input.title, x: 0, y: 0 });
+}
+
 export async function saveOrbitNote(input: { body: Record<string, unknown>; id: string; title: string }): Promise<void> {
   if (!UUID_PATTERN.test(input.id) || !validDocument(input.body)) return;
   const { supabase, userId } = await getAuthenticatedClient();

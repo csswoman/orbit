@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCreateChild, packingProgress } from "./item-nesting";
+import { allowedChildKinds, canCreateChild, packingProgress, parentIdForCreate } from "./item-nesting";
 
 describe("canCreateChild", () => {
   it("allows any canvas kind except check_item on the root", () => {
@@ -28,6 +28,32 @@ describe("canCreateChild", () => {
 
   it("rejects children of leaf kinds", () => {
     expect(canCreateChild({ kind: "note", parentId: null }, "note")).toBe(false);
+  });
+});
+
+describe("allowedChildKinds", () => {
+  it("includes folder for a root folder", () => {
+    expect(allowedChildKinds({ kind: "folder", parentId: null })).toContain("folder");
+  });
+
+  it("does not include folder for a subfolder", () => {
+    expect(allowedChildKinds({ kind: "folder", parentId: "abc" })).not.toContain("folder");
+  });
+
+  it("allows only check_item for a list", () => {
+    expect(allowedChildKinds({ kind: "list", parentId: "folder-1" })).toEqual(["check_item"]);
+  });
+});
+
+describe("parentIdForCreate", () => {
+  it("uses the open folder when the kind is allowed", () => {
+    const open = { id: "folder-1", kind: "folder" as const, parentId: null };
+    expect(parentIdForCreate(open, "note")).toBe("folder-1");
+  });
+
+  it("falls back to root when the kind is not allowed", () => {
+    const open = { id: "sub", kind: "folder" as const, parentId: "root" };
+    expect(parentIdForCreate(open, "folder")).toBe(null);
   });
 });
 
