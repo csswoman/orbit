@@ -351,8 +351,16 @@ export async function duplicateOrbitItem(id: string): Promise<{ error?: string; 
     .select("*")
     .single();
   if (error || !data) return { error: "No se pudo duplicar el elemento." };
+  const item = mapOrbitItemRow(data as OrbitItemRow);
+  if (item.dueDate) {
+    try {
+      await syncOrbitDeadline(supabase, userId, { dueDate: item.dueDate, id: item.id, title: item.title });
+    } catch (cause) {
+      console.error("Orbit deadline sync failed", cause);
+    }
+  }
   revalidateItemPath(row.space_id);
-  return { item: mapOrbitItemRow(data as OrbitItemRow) };
+  return { item };
 }
 
 export async function hydrateLinkPreview(id: string): Promise<{ error?: string; item?: OrbitItem }> {
