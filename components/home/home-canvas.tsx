@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- signed, user-uploaded URLs cannot be declared as fixed Next image hosts. */
 
-import { DndContext, KeyboardSensor, PointerSensor, useDraggable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
 import { CheckSquare2, Copy, Edit3, Expand, ImagePlus, Link2, Maximize2, Minus, MousePointer2, Plus, StickyNote, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
@@ -112,7 +112,8 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null);
   const dragCameraStartRef = useRef<{ x: number; y: number } | null>(null);
   const [dragCameraStart, setDragCameraStart] = useState<{ x: number; y: number } | null>(null);
-  const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 6 } }));
+  const [editingId, setEditingId] = useState<string | null>(null);
   const canPersist = data.status === "ready";
   const didFitCameraRef = useRef(false);
   const itemsRef = useRef(items);
@@ -252,14 +253,17 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
 
   async function createItem(kind: "note" | "task") {
     const position = nextPosition();
-    const content = kind === "note" ? { body: "Una idea que quiero recordar…", title: "Nota" } : { body: "Nueva tarea", checked: false, title: "Hoy" };
+    const content = kind === "note" ? { body: "", title: "Nota" } : { body: "Nueva tarea", checked: false, title: "Hoy" };
     if (!canPersist) {
-      setItems((current) => [...current, localItem({ content, kind, positionX: position.x, positionY: position.y })]);
+      const item = localItem({ content, kind, positionX: position.x, positionY: position.y });
+      setItems((current) => [...current, item]);
+      if (kind === "note") setEditingId(item.id);
       return;
     }
     const result = await createHomeCanvasItem({ content, kind, positionX: position.x, positionY: position.y });
     if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
     setItems((current) => [...current, { ...result.item, imageUrl: null }]);
+    if (kind === "note") setEditingId(result.item.id);
   }
 
   async function createFromText(text: string) {
@@ -350,7 +354,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
       {activeMessage ? <p className="home-canvas-message" role="status">{activeMessage}<button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <DndContext onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }} onDragMove={keepDraggedItemVisible} onDragStart={() => { const activeCamera = cameraRef.current; didDragRef.current = true; dragCameraStartRef.current = { x: activeCamera.x, y: activeCamera.y }; setDragCameraStart({ x: activeCamera.x, y: activeCamera.y }); }} sensors={sensors}>
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
-          {items.map((item) => <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} item={item} key={item.id} onChange={updateItem} onDelete={deleteItem} onDuplicate={() => void duplicateItem(item)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom} />)}
+          {items.map((item) => <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingId === item.id} item={item} key={item.id} onChange={updateItem} onDelete={deleteItem} onDuplicate={() => void duplicateItem(item)} onEdit={() => setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom} />)}
         </div>
       </DndContext>
       <div aria-label="Controles de vista" className="canvas-view-controls" role="group">
@@ -363,22 +367,21 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   );
 }
 
-function CanvasItem({ dragCameraOffset, item, onChange, onDelete, onDuplicate, onExpand, zoom }: { dragCameraOffset?: { x: number; y: number }; item: HomeCanvasItem; onChange: (item: HomeCanvasItem) => void; onDelete: (item: HomeCanvasItem) => void; onDuplicate: () => void; onExpand: () => void; zoom: number }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: item.id });
+function CanvasItem({ dragCameraOffset, editing, item, onChange, onDelete, onDuplicate, onEdit, onExpand, zoom }: { dragCameraOffset?: { x: number; y: number }; editing: boolean; item: HomeCanvasItem; onChange: (item: HomeCanvasItem) => void; onDelete: (item: HomeCanvasItem) => void; onDuplicate: () => void; onEdit: () => void; onExpand: () => void; zoom: number }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ disabled: editing, id: item.id });
   const style = { "--home-x": `${item.positionX}px`, "--home-y": `${item.positionY}px`, transform: transform ? `translate3d(${(transform.x - (dragCameraOffset?.x ?? 0)) / zoom}px, ${(transform.y - (dragCameraOffset?.y ?? 0)) / zoom}px, 0)` : undefined } as CSSProperties;
   const updateContent = (content: HomeCanvasItem["content"]) => onChange({ ...item, content });
-  const [editing, setEditing] = useState(false);
-  return <article {...attributes} {...listeners} className={`home-item home-item--${item.kind}`} ref={setNodeRef} style={style}>
-    <ElementControls editing={editing} onDelete={() => onDelete(item)} onDuplicate={onDuplicate} onEdit={() => setEditing((value) => !value)} onExpand={item.kind === "image" ? onExpand : undefined} />
-    {item.kind === "image" ? <><img alt="Imagen de tu lienzo" draggable={false} onClick={onExpand} src={item.imageUrl ?? ""} /><input aria-label="Texto sobre la imagen" data-no-dnd onBlur={(event) => updateContent({ ...item.content, title: event.target.value })} defaultValue={item.content.title ?? ""} placeholder="Escribe sobre la imagen…" />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} placeholder="Añade una descripción opcional" /> : null}</> : null}
-    {item.kind === "note" ? <><input aria-label="Título de la nota" data-no-dnd defaultValue={item.content.title ?? "Nota"} onBlur={(event) => updateContent({ ...item.content, title: event.target.value })} /><textarea aria-label="Texto de la nota" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} /></> : null}
-    {item.kind === "task" ? <label><input aria-label="Completar tarea" checked={Boolean(item.content.checked)} data-no-dnd onChange={(event) => updateContent({ ...item.content, checked: event.target.checked })} type="checkbox" /><textarea aria-label="Texto de la tarea" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} /></label> : null}
+  return <article {...attributes} {...(editing ? {} : listeners)} className={`home-item home-item--${item.kind}${editing ? " is-editing" : ""}`} ref={setNodeRef} style={style}>
+    <ElementControls editing={editing} onDelete={() => onDelete(item)} onDuplicate={onDuplicate} onEdit={onEdit} onExpand={item.kind === "image" ? onExpand : undefined} />
+    {item.kind === "image" ? <><img alt="Imagen de tu lienzo" draggable={false} onClick={onExpand} src={item.imageUrl ?? ""} />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} placeholder="Añade una descripción opcional" /> : null}</> : null}
+    {item.kind === "note" ? editing ? <><input aria-label="Título de la nota" autoFocus data-no-dnd defaultValue={item.content.title ?? "Nota"} onBlur={(event) => updateContent({ ...item.content, title: event.target.value })} onKeyDown={(event) => event.stopPropagation()} /><textarea aria-label="Texto de la nota" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} onKeyDown={(event) => event.stopPropagation()} placeholder="Escribe una idea…" /></> : <><h3>{item.content.title || "Nota"}</h3><p className={item.content.body ? undefined : "is-placeholder"}>{item.content.body || "Escribe una idea…"}</p></> : null}
+    {item.kind === "task" ? <label><input aria-label="Completar tarea" checked={Boolean(item.content.checked)} data-no-dnd onChange={(event) => updateContent({ ...item.content, checked: event.target.checked })} type="checkbox" /><textarea aria-label="Texto de la tarea" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} onKeyDown={(event) => event.stopPropagation()} /></label> : null}
     {item.kind === "link" && item.content.url ? <><a href={item.content.url} rel="noreferrer" target="_blank"><Link2 aria-hidden="true" /><span><strong>{item.content.title}</strong><small>{item.content.url}</small></span></a>{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} placeholder="Añade una descripción opcional" /> : null}</> : null}
   </article>;
 }
 
 function ElementControls({ editing, onDelete, onDuplicate, onEdit, onExpand }: { editing: boolean; onDelete: () => void; onDuplicate: () => void; onEdit: () => void; onExpand?: () => void }) {
-  return <div className="canvas-element-controls" data-no-dnd><button aria-label="Editar descripción" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button>{onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}<button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button><button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button></div>;
+  return <div className="canvas-element-controls" data-no-dnd><button aria-label="Editar" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button>{onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}<button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button><button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button></div>;
 }
 
 function clamp(value: number) { return Math.min(1_000_000, Math.max(-1_000_000, Math.round(value * 100) / 100)); }

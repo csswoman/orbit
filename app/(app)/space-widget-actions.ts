@@ -115,13 +115,6 @@ export async function saveSheetWidget(
   revalidatePath(`/spaces/${space}`);
 }
 
-export async function saveImageWidget(space: string, widget: { id: string; title: string }) {
-  const { supabase, userId } = await getAuthenticatedClient();
-  if (!await getOwnedSpace(space, userId) || !UUID_PATTERN.test(widget.id)) return;
-  await supabase.from("space_widgets").update({ title: widget.title.trim().slice(0, 120) || "Imagen" }).eq("id", widget.id).eq("space_id", space).eq("user_id", userId).eq("widget_type", "image");
-  revalidatePath(`/spaces/${space}`);
-}
-
 export async function saveWidgetDescription(space: string, widget: { description: string; id: string }) {
   const { supabase, userId } = await getAuthenticatedClient();
   if (!await getOwnedSpace(space, userId) || !UUID_PATTERN.test(widget.id) || widget.description.length > 5_000) return;

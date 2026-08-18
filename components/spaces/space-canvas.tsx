@@ -3,7 +3,6 @@
 
 import {
   DndContext,
-  KeyboardSensor,
   PointerSensor,
   useDraggable,
   useSensor,
@@ -14,7 +13,7 @@ import {
 import { CheckSquare2, Copy, Edit3, Expand, Grid2X2, ImagePlus, LayoutPanelTop, Link2, Maximize2, Minus, MousePointer2, Palette, Plus, Settings2, Sparkles, StickyNote, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { createImageWidget, createLinkWidget, createSheetWidget, deleteSpaceWidget, duplicateSpaceWidget, saveCanvasPreference, saveImageWidget, saveSheetWidget, saveWidgetDescription, saveWidgetPosition } from "@/app/(app)/space-widget-actions";
+import { createImageWidget, createLinkWidget, createSheetWidget, deleteSpaceWidget, duplicateSpaceWidget, saveCanvasPreference, saveSheetWidget, saveWidgetDescription, saveWidgetPosition } from "@/app/(app)/space-widget-actions";
 import { SheetWidget } from "@/components/spaces/sheet-widget";
 import { SpaceSettings } from "@/components/spaces/space-settings";
 import { GradientBg } from "@/components/spaces/gradient-bg";
@@ -70,7 +69,7 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
   const panRef = useRef<{ pointerId: number; startX: number; startY: number; x: number; y: number } | null>(null);
   const dragCameraStartRef = useRef<{ x: number; y: number } | null>(null);
   const [dragCameraStart, setDragCameraStart] = useState<{ x: number; y: number } | null>(null);
-  const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor));
+  const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 8 } }));
   const resourceChildren = Array.isArray(children) ? children : [children];
 
   useEffect(() => {
@@ -190,7 +189,10 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
     setCreating(true);
     const result = await createSheetWidget(space, title, undefined, nextWidgetPosition());
     setCreating(false);
-    if (result.widget) setWidgets((current) => [result.widget, ...current]);
+    if (result.widget) {
+      setWidgets((current) => [result.widget, ...current]);
+      setEditingWidgetId(result.widget.id);
+    }
   }
 
   async function addPastedText(text: string) {
@@ -336,9 +338,8 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
           })}
           {widgets.map((widget, index) => {
             const id = `widget:${widget.id}`;
-            const editableMeta = widget.type === "image" || widget.type === "link";
             const expandImage = () => { if (!didDragRef.current && widget.imageUrl) setExpandedImage(widget.imageUrl); };
-            return <CanvasItem controls={<WidgetControls editing={editingWidgetId === widget.id} onDelete={() => deleteWidget(widget)} onDuplicate={() => void duplicateWidget(widget)} onEdit={editableMeta ? () => setEditingWidgetId((current) => current === widget.id ? null : widget.id) : undefined} onExpand={widget.type === "image" && widget.imageUrl ? expandImage : undefined} />} dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, widgets, resourceChildren.length + index)} zoom={camera.zoom}>{widget.type === "image" ? <ImageWidget editing={editingWidgetId === widget.id} onExpand={expandImage} onSave={(title) => void saveImageWidget(space, { id: widget.id, title })} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : widget.type === "link" ? <LinkWidget editing={editingWidgetId === widget.id} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : <SheetWidget onSave={(next) => void saveSheetWidget(space, next)} widget={widget} />}</CanvasItem>;
+            return <CanvasItem controls={<WidgetControls editing={editingWidgetId === widget.id} onDelete={() => deleteWidget(widget)} onDuplicate={() => void duplicateWidget(widget)} onEdit={() => setEditingWidgetId((current) => current === widget.id ? null : widget.id)} onExpand={widget.type === "image" && widget.imageUrl ? expandImage : undefined} />} dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingWidgetId === widget.id} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, widgets, resourceChildren.length + index)} zoom={camera.zoom}>{widget.type === "image" ? <ImageWidget editing={editingWidgetId === widget.id} onExpand={expandImage} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : widget.type === "link" ? <LinkWidget editing={editingWidgetId === widget.id} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : <SheetWidget editing={editingWidgetId === widget.id} onSave={(next) => void saveSheetWidget(space, next)} widget={widget} />}</CanvasItem>;
           })}
         </div>
         </div>
@@ -354,10 +355,10 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
   );
 }
 
-function CanvasItem({ children, controls, dragCameraOffset, id, layout, position, zoom }: { children: ReactNode; controls?: ReactNode; dragCameraOffset?: { x: number; y: number }; id: string; layout: CanvasLayout; position: { x: number; y: number }; zoom: number }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
+function CanvasItem({ children, controls, dragCameraOffset, editing, id, layout, position, zoom }: { children: ReactNode; controls?: ReactNode; dragCameraOffset?: { x: number; y: number }; editing?: boolean; id: string; layout: CanvasLayout; position: { x: number; y: number }; zoom: number }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ disabled: Boolean(editing), id });
   const style = layout === "free" ? ({ "--widget-x": `${position.x}px`, "--widget-y": `${position.y}px`, transform: transform ? `translate3d(${(transform.x - (dragCameraOffset?.x ?? 0)) / zoom}px, ${(transform.y - (dragCameraOffset?.y ?? 0)) / zoom}px, 0)` : undefined } as CSSProperties) : undefined;
-  return <div {...attributes} {...listeners} aria-label="Widget movible" className="space-canvas__widget" ref={setNodeRef} style={style}>{controls}{children}</div>;
+  return <div {...attributes} {...(editing ? {} : listeners)} aria-label="Widget movible" className={`space-canvas__widget${editing ? " is-editing" : ""}`} ref={setNodeRef} style={style}>{controls}{children}</div>;
 }
 
 function getPosition(id: string, preference: CanvasPreference, widgets: SpaceWidget[], fallbackIndex: number) {
@@ -370,12 +371,12 @@ function getPosition(id: string, preference: CanvasPreference, widgets: SpaceWid
 
 function clamp(value: number) { return Math.min(1_000_000, Math.max(-1_000_000, Math.round(value * 100) / 100)); }
 
-function ImageWidget({ editing, onExpand, onSave, onSaveDescription, widget }: { editing: boolean; onExpand: () => void; onSave: (title: string) => void; onSaveDescription: (description: string) => void; widget: SpaceWidget }) {
-  return <article className="space-image-widget"><img alt="Imagen en tu tablero" draggable={false} onClick={onExpand} src={widget.imageUrl ?? ""} /><input aria-label="Texto sobre la imagen" data-no-dnd defaultValue={widget.title} onBlur={(event) => onSave(event.target.value)} placeholder="Escribe sobre la imagen…" />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={typeof widget.content.description === "string" ? widget.content.description : ""} onBlur={(event) => onSaveDescription(event.target.value)} placeholder="Añade una descripción opcional" /> : null}</article>;
+function ImageWidget({ editing, onExpand, onSaveDescription, widget }: { editing: boolean; onExpand: () => void; onSaveDescription: (description: string) => void; widget: SpaceWidget }) {
+  return <article className="space-image-widget"><img alt="Imagen en tu tablero" draggable={false} onClick={onExpand} src={widget.imageUrl ?? ""} />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={typeof widget.content.description === "string" ? widget.content.description : ""} onBlur={(event) => onSaveDescription(event.target.value)} placeholder="Añade una descripción opcional" /> : null}</article>;
 }
 
 function WidgetControls({ editing, onDelete, onDuplicate, onEdit, onExpand }: { editing: boolean; onDelete: () => void; onDuplicate: () => void; onEdit?: () => void; onExpand?: () => void }) {
-  return <div className="canvas-element-controls" data-no-dnd>{onEdit ? <button aria-label="Editar descripción" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button> : null}{onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}<button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button><button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button></div>;
+  return <div className="canvas-element-controls" data-no-dnd>{onEdit ? <button aria-label="Editar" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button> : null}{onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}<button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button><button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button></div>;
 }
 
 function LinkWidget({ editing, onSaveDescription, widget }: { editing: boolean; onSaveDescription: (description: string) => void; widget: SpaceWidget }) {
