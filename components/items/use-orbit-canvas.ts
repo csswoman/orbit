@@ -102,6 +102,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     const { data: claims } = await supabase.auth.getClaims();
     const userId = claims?.claims?.sub;
     if (!userId) {
+      clearPendingImageParent();
       setMessage("Tu sesión terminó. Vuelve a entrar.");
       return;
     }
@@ -109,11 +110,13 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage.from("orbit-canvas").upload(path, file, { contentType: file.type, upsert: false });
     if (error) {
+      clearPendingImageParent();
       setMessage("No se pudo subir la imagen.");
       return;
     }
     const item = await createItem("image", { imagePath: path, title: file.name.replace(/\.[^.]+$/, "") });
     if (!item) {
+      clearPendingImageParent();
       await supabase.storage.from("orbit-canvas").remove([path]);
       return;
     }
