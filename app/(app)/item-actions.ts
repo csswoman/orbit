@@ -192,6 +192,40 @@ export async function deleteOrbitItem(id: string): Promise<void> {
   revalidateItemPath(data?.space_id ?? null);
 }
 
+export async function saveOrbitCover(input: {
+  coverPath: string;
+  id: string;
+}): Promise<{ coverUrl?: string; error?: string }> {
+  if (!UUID_PATTERN.test(input.id)) {
+    return { error: "Elemento no válido." };
+  }
+
+  const { supabase, userId } = await getAuthenticatedClient();
+  if (!input.coverPath.startsWith(`${userId}/`)) {
+    return { error: "Imagen no válida." };
+  }
+
+  const { data, error } = await supabase
+    .from("orbit_items")
+    .update({ cover_path: input.coverPath })
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .eq("kind", "folder")
+    .select("space_id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return { error: "No se pudo guardar la portada." };
+  }
+
+  const { data: signed } = await supabase.storage
+    .from("orbit-canvas")
+    .createSignedUrl(input.coverPath, 60 * 60);
+
+  revalidateItemPath(data.space_id);
+  return { coverUrl: signed?.signedUrl ?? undefined };
+}
+
 export async function duplicateOrbitItem(id: string): Promise<{ error?: string; item?: OrbitItem }> {
   if (!UUID_PATTERN.test(id)) return { error: "Elemento no válido." };
   const { supabase, userId } = await getAuthenticatedClient();

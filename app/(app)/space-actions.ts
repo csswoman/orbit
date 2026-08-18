@@ -36,7 +36,7 @@ function error(message: string): CrudActionState {
   return { message, status: "error" };
 }
 
-function parseField(field: CrudField, formData: FormData) {
+function parseField(field: CrudField, formData: FormData, userId: string) {
   if (field.type === "checkbox") {
     return formData.get(field.key) === "on";
   }
@@ -80,6 +80,16 @@ function parseField(field: CrudField, formData: FormData) {
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw new Error(`${field.label} debe comenzar con http:// o https://.`);
     }
+  }
+
+  if (field.type === "image") {
+    if (!raw.startsWith(`${userId}/`)) {
+      throw new Error(`${field.label} no es válida.`);
+    }
+    if (raw.length > 512) {
+      throw new Error(`${field.label} es demasiado larga.`);
+    }
+    return raw;
   }
 
   if (field.key === "color" && !COLOR_PATTERN.test(raw)) {
@@ -134,15 +144,21 @@ function validateCombinedData(resourceKey: string, data: Record<string, unknown>
   }
 
   if ("source_type" in data) {
-    const hasContent = [data.title, data.image_url, data.source_url, data.note].some(Boolean);
+    const hasContent = [
+      data.title,
+      data.image_path,
+      data.image_url,
+      data.source_url,
+      data.note,
+    ].some(Boolean);
     if (!hasContent) {
       throw new Error("Agrega un título, una imagen, un enlace o una nota.");
     }
     if (data.source_type === "url" && !data.source_url) {
       throw new Error("Una inspiración de enlace necesita su URL de origen.");
     }
-    if (data.source_type === "sketch" && !data.image_url) {
-      throw new Error("Un boceto necesita la URL de su imagen.");
+    if (data.source_type === "sketch" && !data.image_path && !data.image_url) {
+      throw new Error("Un boceto necesita su imagen.");
     }
   }
 }
@@ -173,7 +189,7 @@ export async function saveSpaceItem(
   let values: Record<string, unknown>;
   try {
     values = Object.fromEntries(
-      resource.fields.map((field) => [field.key, parseField(field, formData)]),
+      resource.fields.map((field) => [field.key, parseField(field, formData, userId)]),
     );
     validateCombinedData(resourceKey, values);
   } catch (validationError) {

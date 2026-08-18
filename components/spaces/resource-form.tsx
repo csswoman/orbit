@@ -6,6 +6,7 @@ import {
   saveSpaceItem,
   type CrudActionState,
 } from "@/app/(app)/space-actions";
+import { ImageUploader } from "@/components/items/image-uploader";
 import type { CrudField, CrudResource } from "@/lib/space-crud";
 import type { RelationOption } from "@/lib/space-data";
 
@@ -123,6 +124,16 @@ function FormField({
   const options = field.optionsFrom
     ? relationOptions[field.optionsFrom.resource] ?? []
     : field.options ?? [];
+
+  if (field.type === "image") {
+    return (
+      <ImageUploader
+        initialPath={initialValue ? String(initialValue) : null}
+        label={field.label}
+        name={field.key}
+      />
+    );
+  }
 
   if (field.type === "checkbox") {
     return (

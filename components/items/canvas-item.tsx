@@ -9,10 +9,11 @@ import { SheetWidget } from "@/components/spaces/sheet-widget";
 import type { ItemKind } from "@/lib/item-nesting";
 import type { OrbitItem } from "@/lib/orbit-item";
 
-export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpenFolder, onCloseFolder, onAddChild, onToggleCheck, onChildAdded, onSaveNote, onExpandImage }: {
+export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpenFolder, onCloseFolder, onChangeCover, onAddChild, onToggleCheck, onChildAdded, onSaveNote, onExpandImage }: {
   editing: boolean;
   item: OrbitItem;
   onAddChild: (parentId: string, kind: ItemKind) => void;
+  onChangeCover?: (id: string) => void;
   onChildAdded: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
   onExpandImage?: () => void;
@@ -29,6 +30,7 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
         item={item}
         onAddChild={(kind) => onAddChild(item.id, kind)}
         onAddChildTo={onAddChild}
+        onChangeCover={onChangeCover}
         onChildAdded={onChildAdded}
         onCloseFolder={onCloseFolder}
         onOpenFolder={onOpenFolder}

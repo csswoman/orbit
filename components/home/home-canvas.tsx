@@ -172,7 +172,7 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
           {rootItems.map((item) => (
             <HomeDragItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={canvas.editingId === item.id} item={item} key={item.id} onDelete={() => canvas.removeItem(item)} onDuplicate={() => void canvas.duplicateItem(item)} onEdit={() => canvas.setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom}>
-              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
+              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChangeCover={canvas.openCoverPicker} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
             </HomeDragItem>
           ))}
         </div>

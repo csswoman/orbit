@@ -2,6 +2,7 @@ export type CrudFieldType =
   | "checkbox"
   | "date"
   | "datetime-local"
+  | "image"
   | "number"
   | "select"
   | "tags"
@@ -276,7 +277,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
           },
           { key: "status", label: "Estado", options: statusOptions.wishlist, required: true, type: "select" },
           { key: "url", label: "Enlace", type: "url" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
           { key: "notes", label: "Notas", type: "textarea" },
         ],
         key: "items",
@@ -316,7 +317,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
           { key: "description", label: "Descripción", type: "textarea" },
           { key: "status", label: "Estado", options: statusOptions.project, required: true, type: "select" },
           { key: "color", label: "Color hexadecimal", placeholder: "#4F46E5", type: "text" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
         ],
         key: "items",
         orderBy: "updated_at",
@@ -355,7 +356,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
             type: "select",
           },
           { key: "source_url", label: "Enlace de origen", type: "url" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
           { key: "note", label: "Nota", type: "textarea" },
           { key: "tags", label: "Etiquetas", placeholder: "arte, interfaz, color", type: "tags" },
         ],

@@ -18,11 +18,12 @@ const KIND_LABELS: Record<ItemKind, string> = {
   note: "Nota",
 };
 
-export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded }: {
+export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder, onChangeCover, spaceKind, onAddChild, onToggleCheck, onAddChildTo, onChildAdded }: {
   activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
   onAddChildTo?: (parentId: string, kind: ItemKind) => void;
+  onChangeCover?: (id: string) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
   onOpenFolder: (id: string) => void;
@@ -56,7 +57,12 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
     <article className="folder-widget is-open" data-no-dnd>
       <header className="folder-widget__header">
         <p className="folder-widget__title">{item.title}</p>
-        <button onClick={() => onCloseFolder(item.id, item.parentId)} type="button">Cerrar</button>
+        <div className="folder-widget__header-actions">
+          {onChangeCover ? (
+            <button onClick={() => onChangeCover(item.id)} type="button">Portada</button>
+          ) : null}
+          <button onClick={() => onCloseFolder(item.id, item.parentId)} type="button">Cerrar</button>
+        </div>
       </header>
       <ul className="folder-widget__children">
         {item.children.map((child) => (
@@ -74,6 +80,7 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
                 item={child}
                 onAddChild={(kind) => (onAddChildTo ?? ((_parentId, nestedKind) => onAddChild(nestedKind)))(child.id, kind)}
                 onAddChildTo={onAddChildTo}
+                onChangeCover={onChangeCover}
                 onChildAdded={onChildAdded}
                 onCloseFolder={onCloseFolder}
                 onOpenFolder={onOpenFolder}
@@ -100,11 +107,12 @@ export function FolderWidget({ item, activeFolderId, onOpenFolder, onCloseFolder
   );
 }
 
-function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildTo, onChildAdded, onOpenFolder, onCloseFolder, onToggleCheck }: {
+function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildTo, onChangeCover, onChildAdded, onOpenFolder, onCloseFolder, onToggleCheck }: {
   activeFolderId: string | null;
   item: OrbitItem;
   onAddChild: (kind: ItemKind) => void;
   onAddChildTo?: (parentId: string, kind: ItemKind) => void;
+  onChangeCover?: (id: string) => void;
   onChildAdded?: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
   onOpenFolder: (id: string) => void;
@@ -117,6 +125,7 @@ function NestedFolder({ item, activeFolderId, spaceKind, onAddChild, onAddChildT
       item={item}
       onAddChild={onAddChild}
       onAddChildTo={onAddChildTo}
+      onChangeCover={onChangeCover}
       onChildAdded={onChildAdded}
       onCloseFolder={onCloseFolder}
       onOpenFolder={onOpenFolder}

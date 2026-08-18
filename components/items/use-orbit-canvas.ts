@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from "react";
 
-import { addChildItem, createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveCheckItem, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
+import { addChildItem, createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveCheckItem, saveOrbitCover, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
 import { shouldClearPendingImageParent } from "@/lib/image-picker";
 import { parentIdForCreate, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
 import { addOrbitChild, documentWithText, dropOrbitItem, findOrbitItem, folderTreeContainsId, patchOrbitItem, type OrbitItem, type OrbitItemKind } from "@/lib/orbit-item";
+import { uploadCanvasImage } from "@/lib/upload-canvas-image";
 import { createClient } from "@/lib/supabase/client";
 
 export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId }: {
@@ -21,6 +22,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const imageParentRef = useRef<string | null>(null);
+  const coverTargetRef = useRef<string | null>(null);
   const pickerOpenRef = useRef(false);
 
   function clearPendingImageParent() {
@@ -33,8 +35,17 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     imageInput.current?.click();
   }
 
+  function openCoverPicker(folderId: string) {
+    coverTargetRef.current = folderId;
+    pickerOpenRef.current = true;
+    imageInput.current?.click();
+  }
+
   function finishImagePicker(hasSelectedFile: boolean) {
-    if (shouldClearPendingImageParent(pickerOpenRef.current, hasSelectedFile)) clearPendingImageParent();
+    if (shouldClearPendingImageParent(pickerOpenRef.current, hasSelectedFile)) {
+      clearPendingImageParent();
+    }
+    if (!hasSelectedFile) coverTargetRef.current = null;
     pickerOpenRef.current = false;
   }
 
@@ -93,34 +104,49 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   }
 
   async function addImage(file?: File) {
-    if (!file || !file.type.match(/^image\/(avif|jpeg|png|webp)$/) || file.size > 10 * 1024 * 1024) {
+    const coverId = coverTargetRef.current;
+    coverTargetRef.current = null;
+
+    if (!file) {
       imageParentRef.current = null;
-      if (file) setMessage("Usa JPG, PNG, WebP o AVIF de hasta 10 MB.");
       return;
     }
-    const supabase = createClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    const userId = claims?.claims?.sub;
-    if (!userId) {
-      clearPendingImageParent();
-      setMessage("Tu sesión terminó. Vuelve a entrar.");
+
+    const uploaded = await uploadCanvasImage(file);
+    if (uploaded.error || !uploaded.path) {
+      imageParentRef.current = null;
+      setMessage(uploaded.error ?? "No se pudo subir la imagen.");
       return;
     }
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const path = `${userId}/${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from("orbit-canvas").upload(path, file, { contentType: file.type, upsert: false });
-    if (error) {
-      clearPendingImageParent();
-      setMessage("No se pudo subir la imagen.");
+
+    if (coverId) {
+      const result = await saveOrbitCover({ coverPath: uploaded.path, id: coverId });
+      if (result.error) {
+        setMessage(result.error);
+        return;
+      }
+      setItems((current) =>
+        patchOrbitItem(current, coverId, {
+          coverPath: uploaded.path,
+          coverUrl: result.coverUrl ?? uploaded.previewUrl ?? null,
+        }),
+      );
       return;
     }
-    const item = await createItem("image", { imagePath: path, title: file.name.replace(/\.[^.]+$/, "") });
+
+    const item = await createItem("image", {
+      imagePath: uploaded.path,
+      title: file.name.replace(/\.[^.]+$/, "") || "Imagen",
+    });
     if (!item) {
-      clearPendingImageParent();
-      await supabase.storage.from("orbit-canvas").remove([path]);
+      const supabase = createClient();
+      await supabase.storage.from("orbit-canvas").remove([uploaded.path]);
+      if (uploaded.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(uploaded.previewUrl);
       return;
     }
-    setItems((current) => patchOrbitItem(current, item.id, { imageUrl: URL.createObjectURL(file) }));
+    if (uploaded.previewUrl) {
+      setItems((current) => patchOrbitItem(current, item.id, { imageUrl: uploaded.previewUrl ?? null }));
+    }
   }
 
   async function addChild(parentId: string, kind: ItemKind): Promise<"image" | void> {
@@ -212,6 +238,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
       setItems((current) => patchOrbitItem(current, id, { positionX, positionY }));
       void saveOrbitItemPosition({ id, x: positionX, y: positionY });
     },
+    openCoverPicker,
     openFolderId,
     openImagePicker,
     removeItem(item: OrbitItem) {
