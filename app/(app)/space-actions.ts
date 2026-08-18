@@ -148,7 +148,6 @@ function validateCombinedData(resourceKey: string, data: Record<string, unknown>
     const hasContent = [
       data.title,
       data.image_path,
-      data.image_url,
       data.source_url,
       data.note,
     ].some(Boolean);
@@ -158,7 +157,7 @@ function validateCombinedData(resourceKey: string, data: Record<string, unknown>
     if (data.source_type === "url" && !data.source_url) {
       throw new Error("Una inspiración de enlace necesita su URL de origen.");
     }
-    if (data.source_type === "sketch" && !data.image_path && !data.image_url) {
+    if (data.source_type === "sketch" && !data.image_path) {
       throw new Error("Un boceto necesita su imagen.");
     }
   }
@@ -207,9 +206,6 @@ function buildValidationData(
 
   if (!validationData.image_path && existingRow.image_path) {
     validationData.image_path = existingRow.image_path;
-  }
-  if (!validationData.image_url && existingRow.image_url) {
-    validationData.image_url = existingRow.image_url;
   }
 
   return validationData;

@@ -2,10 +2,11 @@
 /* eslint-disable @next/next/no-img-element -- signed, user-uploaded URLs cannot be declared as fixed Next image hosts. */
 
 import { DndContext, useDraggable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
-import { CheckSquare2, Folder, Grid2X2, ImagePlus, LayoutPanelTop, Link2, Maximize2, Minus, MousePointer2, Palette, Plus, Settings2, Sparkles, StickyNote, X } from "lucide-react";
+import { Grid2X2, LayoutPanelTop, Maximize2, Minus, MousePointer2, Palette, Plus, Settings2, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { saveCanvasPreference } from "@/app/(app)/space-widget-actions";
+import { saveCanvasPreference } from "@/app/(app)/canvas-preference-actions";
+import { AddItemPicker } from "@/components/items/add-item-picker";
 import { OrbitCanvasItem, WidgetControls } from "@/components/items/canvas-item";
 import { CanvasPointerSensor } from "@/components/items/canvas-pointer-sensor";
 import { useOrbitCanvas } from "@/components/items/use-orbit-canvas";
@@ -155,11 +156,13 @@ export function SpaceCanvas({ adjustmentContent, children, items: initialItems, 
       <header className="space-canvas__toolbar">
         <div className="space-canvas__actions">
           <span aria-label="Mover (V)" className="space-canvas__move canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" className="size-4" /></span>
-          <button aria-label="Crear carpeta" className="space-canvas__tool canvas-tooltip" data-tooltip="Carpeta" disabled={canvas.creating} onClick={() => void canvas.createItem("folder")} type="button"><Folder aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Crear lista (T)" className="space-canvas__tool canvas-tooltip" data-tooltip="Lista · T" disabled={canvas.creating} onClick={() => void canvas.createItem("list")} type="button"><CheckSquare2 aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Crear nota (N)" className="space-canvas__tool canvas-tooltip" data-tooltip={canvas.creating ? "Creando…" : "Nota · N"} disabled={canvas.creating} onClick={() => void canvas.createItem("note")} type="button"><StickyNote aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Añadir imagen (I)" className="space-canvas__tool canvas-tooltip" data-tooltip="Imagen · I" disabled={canvas.creating} onClick={() => canvas.openImagePicker(true)} type="button"><ImagePlus aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Añadir enlace" className="space-canvas__tool canvas-tooltip" data-tooltip="Enlace" disabled={canvas.creating} onClick={() => void canvas.addLink()} type="button"><Link2 aria-hidden="true" className="size-4" /></button>
+          <AddItemPicker
+            disabled={canvas.creating}
+            onCountdown={(input) => void canvas.createItem("countdown", input)}
+            onCreate={(kind) => void canvas.createItem(kind)}
+            onImage={() => canvas.openImagePicker(true)}
+            onLink={(url) => void canvas.addLink(undefined, url)}
+          />
           <button aria-expanded={adjusting} aria-label="Ajustar canvas" className="space-canvas__adjust canvas-tooltip" data-tooltip="Ajustar" onClick={() => setAdjusting((open) => !open)} type="button"><Settings2 aria-hidden="true" className="size-4" /></button>
         </div>
         <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" {...canvas.imageInputHandlers} ref={imageInput} type="file" />

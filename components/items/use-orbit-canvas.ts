@@ -100,8 +100,8 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     await createItem("note", { body: documentWithText(text), title: "Texto" });
   }
 
-  async function addLink(parentId?: string) {
-    const raw = window.prompt("URL del enlace")?.trim();
+  async function addLink(parentId?: string, providedUrl?: string) {
+    const raw = (providedUrl ?? window.prompt("URL del enlace"))?.trim();
     if (!raw) return;
     if (!isHttpUrl(raw)) {
       setMessage("Enlace no válido.");
