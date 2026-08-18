@@ -13,13 +13,16 @@ import {
 import { CheckSquare2, Copy, Edit3, Expand, Grid2X2, ImagePlus, LayoutPanelTop, Link2, Maximize2, Minus, MousePointer2, Palette, Plus, Settings2, Sparkles, StickyNote, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { createImageWidget, createLinkWidget, createSheetWidget, deleteSpaceWidget, duplicateSpaceWidget, saveCanvasPreference, saveSheetWidget, saveWidgetDescription, saveWidgetPosition } from "@/app/(app)/space-widget-actions";
+import { createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
+import { saveCanvasPreference } from "@/app/(app)/space-widget-actions";
 import { SheetWidget } from "@/components/spaces/sheet-widget";
 import { SpaceSettings } from "@/components/spaces/space-settings";
 import { GradientBg } from "@/components/spaces/gradient-bg";
+import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
+import type { OrbitItem } from "@/lib/orbit-item";
 import type { OrbitSpace } from "@/lib/orbit-spaces";
 import { createClient } from "@/lib/supabase/client";
-import type { CanvasPreference, SpaceWidget } from "@/lib/space-widgets";
+import type { CanvasPreference } from "@/lib/space-widgets";
 
 type CanvasLayout = CanvasPreference["layout"];
 type CanvasTheme = CanvasPreference["theme"];
@@ -48,18 +51,18 @@ class CanvasPointerSensor extends PointerSensor {
   }];
 }
 
-export function SpaceCanvas({ adjustmentContent, children, preference: initialPreference, space, spaceDetails, widgets: initialWidgets }: {
-  adjustmentContent?: ReactNode; children: ReactNode; preference: CanvasPreference; space: string; spaceDetails: OrbitSpace; widgets: SpaceWidget[];
+export function SpaceCanvas({ adjustmentContent, children, items: initialItems, preference: initialPreference, space, spaceDetails }: {
+  adjustmentContent?: ReactNode; children: ReactNode; items: OrbitItem[]; preference: CanvasPreference; space: string; spaceDetails: OrbitSpace;
 }) {
   const [preference, setPreference] = useState(initialPreference);
   const [accentColor, setAccentColor] = useState(spaceDetails.accentColor);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState(spaceDetails.backgroundImageUrl);
   const [backgroundOverlay, setBackgroundOverlay] = useState(spaceDetails.backgroundOverlay);
-  const [widgets, setWidgets] = useState(initialWidgets);
+  const [items, setItems] = useState(initialItems);
   const [adjusting, setAdjusting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
-  const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const cameraRef = useRef(camera);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -71,13 +74,14 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
   const [dragCameraStart, setDragCameraStart] = useState<{ x: number; y: number } | null>(null);
   const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 8 } }));
   const resourceChildren = Array.isArray(children) ? children : [children];
+  const rootItems = items.filter((item) => item.parentId === null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && target.matches("input, textarea, [contenteditable='true']")) return;
-      if (event.key.toLowerCase() === "n") { event.preventDefault(); void addSheet(); }
-      if (event.key.toLowerCase() === "t") { event.preventDefault(); void addSheet("Tarea"); }
+      if (event.key.toLowerCase() === "n") { event.preventDefault(); void addNote(); }
+      if (event.key.toLowerCase() === "t") { event.preventDefault(); void addList(); }
       if (event.key.toLowerCase() === "i") { event.preventDefault(); imageInput.current?.click(); }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -185,29 +189,37 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
-  async function addSheet(title = "Nueva hoja") {
+  async function addNote() {
     setCreating(true);
-    const result = await createSheetWidget(space, title, undefined, nextWidgetPosition());
+    const position = nextItemPosition();
+    const result = await createOrbitItem({ kind: "note", spaceId: space, x: position.x, y: position.y });
     setCreating(false);
-    if (result.widget) {
-      setWidgets((current) => [result.widget, ...current]);
-      setEditingWidgetId(result.widget.id);
+    if (result.item) {
+      setItems((current) => [result.item!, ...current]);
+      setEditingItemId(result.item.id);
     }
   }
 
+  async function addList() {
+    setCreating(true);
+    const position = nextItemPosition();
+    const result = await createOrbitItem({ kind: "list", spaceId: space, x: position.x, y: position.y });
+    setCreating(false);
+    if (result.item) setItems((current) => [...current, result.item!]);
+  }
+
   async function addPastedText(text: string) {
-    const position = nextWidgetPosition();
-    const url = safeUrl(text);
-    if (url) {
-      const result = await createLinkWidget(space, { title: new URL(url).hostname, url, ...position });
-      if (result.widget) setWidgets((current) => [...current, result.widget]);
+    const position = nextItemPosition();
+    if (isHttpUrl(text)) {
+      const result = await createOrbitItem({ kind: "link", spaceId: space, title: linkTitleFromUrl(text), url: text, x: position.x, y: position.y });
+      if (result.item) setItems((current) => [...current, result.item!]);
       return;
     }
-    const result = await createSheetWidget(space, "Texto", documentWithText(text), position);
-    if (result.widget) {
-      setWidgets((current) => [...current, { ...result.widget, positionX: position.x, positionY: position.y }]);
-      void saveWidgetPosition(space, { id: result.widget.id, ...position });
-    }
+    const result = await createOrbitItem({ kind: "note", spaceId: space, title: "Texto", x: position.x, y: position.y });
+    if (!result.item) return;
+    const body = documentWithText(text);
+    setItems((current) => [...current, { ...result.item!, body, positionX: position.x, positionY: position.y }]);
+    void saveOrbitNote({ body, id: result.item.id, title: result.item.title });
   }
 
   async function addImage(file?: File) {
@@ -220,44 +232,44 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage.from("orbit-canvas").upload(path, file, { contentType: file.type, upsert: false });
     if (error) return;
-    const position = nextWidgetPosition();
-    const result = await createImageWidget(space, { imagePath: path, title: file.name.replace(/\.[^.]+$/, ""), ...position });
-    if (!result.widget) { await supabase.storage.from("orbit-canvas").remove([path]); return; }
-    setWidgets((current) => [...current, { ...result.widget, imageUrl: URL.createObjectURL(file) }]);
+    const position = nextItemPosition();
+    const result = await createOrbitItem({ imagePath: path, kind: "image", spaceId: space, title: file.name.replace(/\.[^.]+$/, ""), x: position.x, y: position.y });
+    if (!result.item) { await supabase.storage.from("orbit-canvas").remove([path]); return; }
+    setItems((current) => [...current, { ...result.item!, imageUrl: URL.createObjectURL(file) }]);
   }
 
-  function nextWidgetPosition() {
+  function nextItemPosition() {
     const bounds = viewportRef.current?.getBoundingClientRect();
     const x = bounds ? (bounds.width / 2 - camera.x) / camera.zoom : 144;
     const y = bounds ? (bounds.height / 2 - camera.y) / camera.zoom : 96;
-    const offset = (widgets.length % 4) * 36;
+    const offset = (items.length % 4) * 36;
     return { x: clamp(x + offset), y: clamp(y + offset) };
   }
 
-  async function duplicateWidget(widget: SpaceWidget) {
-    const result = await duplicateSpaceWidget(space, widget.id);
-    if (result.widget) setWidgets((current) => [...current, { ...result.widget, imageUrl: widget.imageUrl }]);
+  async function duplicateItem(item: OrbitItem) {
+    const result = await duplicateOrbitItem(item.id);
+    if (result.item) setItems((current) => [...current, { ...result.item!, imageUrl: item.imageUrl }]);
   }
 
-  function deleteWidget(widget: SpaceWidget) {
-    setWidgets((current) => current.filter((candidate) => candidate.id !== widget.id));
-    void deleteSpaceWidget(space, widget.id);
+  function removeItem(item: OrbitItem) {
+    setItems((current) => current.filter((candidate) => candidate.id !== item.id));
+    void deleteOrbitItem(item.id);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     if (!event.delta.x && !event.delta.y) return;
     const identifier = String(event.active.id);
-    const currentPosition = getPosition(identifier, preference, widgets, resourceChildren.length);
+    const currentPosition = getPosition(identifier, preference, items, resourceChildren.length);
     const board = boardRef.current;
     if (!board) return;
     const cameraStart = dragCameraStartRef.current;
     const activeCamera = cameraRef.current;
     const cameraOffset = cameraStart ? { x: activeCamera.x - cameraStart.x, y: activeCamera.y - cameraStart.y } : { x: 0, y: 0 };
     const next = { x: clamp(currentPosition.x + (event.delta.x - cameraOffset.x) / activeCamera.zoom), y: clamp(currentPosition.y + (event.delta.y - cameraOffset.y) / activeCamera.zoom) };
-    if (identifier.startsWith("widget:")) {
-      const widgetId = identifier.slice("widget:".length);
-      setWidgets((current) => current.map((widget) => widget.id === widgetId ? { ...widget, positionX: next.x, positionY: next.y } : widget));
-      void saveWidgetPosition(space, { id: widgetId, ...next });
+    if (identifier.startsWith("item:")) {
+      const itemId = identifier.slice("item:".length);
+      setItems((current) => current.map((item) => item.id === itemId ? { ...item, positionX: next.x, positionY: next.y } : item));
+      void saveOrbitItemPosition({ id: itemId, x: next.x, y: next.y });
       return;
     }
     updatePreference({ ...preference, positions: { ...preference.positions, [identifier]: next } });
@@ -299,8 +311,8 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
       <header className="space-canvas__toolbar">
         <div className="space-canvas__actions">
           <span aria-label="Mover (V)" className="space-canvas__move canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" className="size-4" /></span>
-          <button aria-label="Crear nota (N)" className="space-canvas__tool canvas-tooltip" data-tooltip={creating ? "Creando…" : "Nota · N"} disabled={creating} onClick={() => void addSheet()} type="button"><StickyNote aria-hidden="true" className="size-4" /></button>
-          <button aria-label="Crear tarea (T)" className="space-canvas__tool canvas-tooltip" data-tooltip="Tarea · T" disabled={creating} onClick={() => void addSheet("Tarea")} type="button"><CheckSquare2 aria-hidden="true" className="size-4" /></button>
+          <button aria-label="Crear nota (N)" className="space-canvas__tool canvas-tooltip" data-tooltip={creating ? "Creando…" : "Nota · N"} disabled={creating} onClick={() => void addNote()} type="button"><StickyNote aria-hidden="true" className="size-4" /></button>
+          <button aria-label="Crear lista (T)" className="space-canvas__tool canvas-tooltip" data-tooltip="Lista · T" disabled={creating} onClick={() => void addList()} type="button"><CheckSquare2 aria-hidden="true" className="size-4" /></button>
           <button aria-label="Añadir imagen (I)" className="space-canvas__tool canvas-tooltip" data-tooltip="Imagen · I" disabled={creating} onClick={() => imageInput.current?.click()} type="button"><ImagePlus aria-hidden="true" className="size-4" /></button>
           <button aria-expanded={adjusting} aria-label="Ajustar canvas" className="space-canvas__adjust canvas-tooltip" data-tooltip="Ajustar" onClick={() => setAdjusting((open) => !open)} type="button"><Settings2 aria-hidden="true" className="size-4" /></button>
         </div>
@@ -334,12 +346,12 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
         <div className="space-canvas__board" ref={boardRef} style={preference.layout === "free" ? { transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` } : undefined}>
           {resourceChildren.map((child, index) => {
             const id = `resource:${index}`;
-            return <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, widgets, index)} zoom={camera.zoom}><div className="space-canvas__resource">{child}</div></CanvasItem>;
+            return <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, items, index)} zoom={camera.zoom}><div className="space-canvas__resource">{child}</div></CanvasItem>;
           })}
-          {widgets.map((widget, index) => {
-            const id = `widget:${widget.id}`;
-            const expandImage = () => { if (!didDragRef.current && widget.imageUrl) setExpandedImage(widget.imageUrl); };
-            return <CanvasItem controls={<WidgetControls editing={editingWidgetId === widget.id} onDelete={() => deleteWidget(widget)} onDuplicate={() => void duplicateWidget(widget)} onEdit={() => setEditingWidgetId((current) => current === widget.id ? null : widget.id)} onExpand={widget.type === "image" && widget.imageUrl ? expandImage : undefined} />} dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingWidgetId === widget.id} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, widgets, resourceChildren.length + index)} zoom={camera.zoom}>{widget.type === "image" ? <ImageWidget editing={editingWidgetId === widget.id} onExpand={expandImage} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : widget.type === "link" ? <LinkWidget editing={editingWidgetId === widget.id} onSaveDescription={(description) => void saveWidgetDescription(space, { description, id: widget.id })} widget={widget} /> : <SheetWidget editing={editingWidgetId === widget.id} onSave={(next) => void saveSheetWidget(space, next)} widget={widget} />}</CanvasItem>;
+          {rootItems.map((item, index) => {
+            const id = `item:${item.id}`;
+            const expandImage = () => { if (!didDragRef.current && item.imageUrl) setExpandedImage(item.imageUrl); };
+            return <CanvasItem controls={<WidgetControls editing={editingItemId === item.id} onDelete={() => removeItem(item)} onDuplicate={() => void duplicateItem(item)} onEdit={() => setEditingItemId((current) => current === item.id ? null : item.id)} onExpand={item.kind === "image" && item.imageUrl ? expandImage : undefined} />} dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingItemId === item.id} id={id} key={id} layout={preference.layout} position={getPosition(id, preference, items, resourceChildren.length + index)} zoom={camera.zoom}>{renderCanvasItem(item, editingItemId === item.id, expandImage, (next) => { setItems((current) => current.map((candidate) => candidate.id === next.id ? { ...candidate, ...next } : candidate)); void saveOrbitNote(next); })}</CanvasItem>;
           })}
         </div>
         </div>
@@ -355,37 +367,49 @@ export function SpaceCanvas({ adjustmentContent, children, preference: initialPr
   );
 }
 
+function renderCanvasItem(
+  item: OrbitItem,
+  editing: boolean,
+  onExpand: () => void,
+  onSaveNote: (next: { body: Record<string, unknown>; id: string; title: string }) => void,
+) {
+  if (item.kind === "image") return <ImageWidget item={item} onExpand={onExpand} />;
+  if (item.kind === "link") return <LinkWidget item={item} />;
+  if (item.kind === "note") return <SheetWidget editing={editing} item={item} onSave={onSaveNote} />;
+  return (
+    <article className="space-list-widget">
+      <p className="space-list-widget__title">{item.title}</p>
+    </article>
+  );
+}
+
 function CanvasItem({ children, controls, dragCameraOffset, editing, id, layout, position, zoom }: { children: ReactNode; controls?: ReactNode; dragCameraOffset?: { x: number; y: number }; editing?: boolean; id: string; layout: CanvasLayout; position: { x: number; y: number }; zoom: number }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ disabled: Boolean(editing), id });
   const style = layout === "free" ? ({ "--widget-x": `${position.x}px`, "--widget-y": `${position.y}px`, transform: transform ? `translate3d(${(transform.x - (dragCameraOffset?.x ?? 0)) / zoom}px, ${(transform.y - (dragCameraOffset?.y ?? 0)) / zoom}px, 0)` : undefined } as CSSProperties) : undefined;
   return <div {...attributes} {...(editing ? {} : listeners)} aria-label="Widget movible" className={`space-canvas__widget${editing ? " is-editing" : ""}`} ref={setNodeRef} style={style}>{controls}{children}</div>;
 }
 
-function getPosition(id: string, preference: CanvasPreference, widgets: SpaceWidget[], fallbackIndex: number) {
-  if (id.startsWith("widget:")) {
-    const widget = widgets.find((item) => item.id === id.slice("widget:".length));
-    if (widget) return { x: widget.positionX, y: widget.positionY };
+function getPosition(id: string, preference: CanvasPreference, items: OrbitItem[], fallbackIndex: number) {
+  if (id.startsWith("item:")) {
+    const item = items.find((candidate) => candidate.id === id.slice("item:".length));
+    if (item) return { x: item.positionX, y: item.positionY };
   }
   return preference.positions[id] ?? fallbackPositions[fallbackIndex % fallbackPositions.length];
 }
 
 function clamp(value: number) { return Math.min(1_000_000, Math.max(-1_000_000, Math.round(value * 100) / 100)); }
 
-function ImageWidget({ editing, onExpand, onSaveDescription, widget }: { editing: boolean; onExpand: () => void; onSaveDescription: (description: string) => void; widget: SpaceWidget }) {
-  return <article className="space-image-widget"><img alt="Imagen en tu tablero" draggable={false} onClick={onExpand} src={widget.imageUrl ?? ""} />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={typeof widget.content.description === "string" ? widget.content.description : ""} onBlur={(event) => onSaveDescription(event.target.value)} placeholder="Añade una descripción opcional" /> : null}</article>;
+function ImageWidget({ item, onExpand }: { item: OrbitItem; onExpand: () => void }) {
+  return <article className="space-image-widget"><img alt="Imagen en tu tablero" draggable={false} onClick={onExpand} src={item.imageUrl ?? ""} /></article>;
 }
 
 function WidgetControls({ editing, onDelete, onDuplicate, onEdit, onExpand }: { editing: boolean; onDelete: () => void; onDuplicate: () => void; onEdit?: () => void; onExpand?: () => void }) {
   return <div className="canvas-element-controls" data-no-dnd>{onEdit ? <button aria-label="Editar" aria-pressed={editing} onClick={onEdit} type="button"><Edit3 aria-hidden="true" /></button> : null}{onExpand ? <button aria-label="Ampliar imagen" onClick={onExpand} type="button"><Expand aria-hidden="true" /></button> : null}<button aria-label="Duplicar elemento" onClick={onDuplicate} type="button"><Copy aria-hidden="true" /></button><button aria-label="Eliminar elemento" className="is-danger" onClick={onDelete} type="button"><Trash2 aria-hidden="true" /></button></div>;
 }
 
-function LinkWidget({ editing, onSaveDescription, widget }: { editing: boolean; onSaveDescription: (description: string) => void; widget: SpaceWidget }) {
-  if (!widget.linkUrl) return null;
-  return <><a className="space-link-widget" href={widget.linkUrl} rel="noreferrer" target="_blank"><Link2 aria-hidden="true" /><span><strong>{widget.title}</strong><small>{widget.linkUrl}</small></span></a>{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={typeof widget.content.description === "string" ? widget.content.description : ""} onBlur={(event) => onSaveDescription(event.target.value)} placeholder="Añade una descripción opcional" /> : null}</>;
+function LinkWidget({ item }: { item: OrbitItem }) {
+  if (!item.url) return null;
+  return <a className="space-link-widget" href={item.url} rel="noreferrer" target="_blank"><Link2 aria-hidden="true" /><span><strong>{item.title}</strong><small>{item.url}</small></span></a>;
 }
 
 function documentWithText(text: string) { return { content: text.slice(0, 5000).split(/\r?\n/).filter(Boolean).map((line) => ({ content: [{ text: line, type: "text" }], type: "paragraph" })), type: "doc" }; }
-
-function safeUrl(value: string) {
-  try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null; } catch { return null; }
-}

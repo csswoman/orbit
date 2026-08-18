@@ -5,10 +5,12 @@ import { DndContext, PointerSensor, useDraggable, useSensor, useSensors, type Dr
 import { CheckSquare2, Copy, Edit3, Expand, ImagePlus, Link2, Maximize2, Minus, MousePointer2, Plus, StickyNote, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { createHomeCanvasItem, deleteHomeCanvasItem, duplicateHomeCanvasItem, saveHomeCanvasItem } from "@/app/(app)/home-canvas-actions";
+import { createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
+import { SheetWidget } from "@/components/spaces/sheet-widget";
 import { GradientBg } from "@/components/spaces/gradient-bg";
+import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
+import { defaultSize, type OrbitItem } from "@/lib/orbit-item";
 import { createClient } from "@/lib/supabase/client";
-import type { HomeCanvasData, HomeCanvasItem, HomeCanvasKind } from "@/lib/home-canvas";
 
 class CanvasPointerSensor extends PointerSensor {
   static activators = [{
@@ -25,21 +27,8 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
 const ZOOM_STEP = 0.1;
 
-function estimateHomeItemSize(kind: HomeCanvasKind) {
-  switch (kind) {
-    case "image":
-      return { height: 300, width: 400 };
-    case "note":
-      return { height: 192, width: 320 };
-    case "task":
-      return { height: 120, width: 320 };
-    case "link":
-      return { height: 80, width: 320 };
-  }
-}
-
 function fitCameraToHomeItems(
-  items: HomeCanvasItem[],
+  items: OrbitItem[],
   viewport: HTMLElement | null,
   setCamera: (value: { x: number; y: number; zoom: number }) => void,
   cameraRef: { current: { x: number; y: number; zoom: number } },
@@ -53,7 +42,7 @@ function fitCameraToHomeItems(
   let maxY = -Infinity;
 
   for (const item of items) {
-    const size = estimateHomeItemSize(item.kind);
+    const size = defaultSize(item.kind);
     minX = Math.min(minX, item.positionX);
     minY = Math.min(minY, item.positionY);
     maxX = Math.max(maxX, item.positionX + size.width);
@@ -86,23 +75,10 @@ function fitCameraToHomeItems(
   return true;
 }
 
-export function HomeCanvas({ data }: { data: HomeCanvasData }) {
-  const serverItems = data.status === "ready" ? data.items : null;
-  const [items, setItems] = useState<HomeCanvasItem[]>(() => (data.status === "ready" ? data.items : []));
-  const [syncedServerItems, setSyncedServerItems] = useState(serverItems);
-  if (serverItems !== syncedServerItems) {
-    setSyncedServerItems(serverItems);
-    if (serverItems) setItems(serverItems);
-  }
-
-  const statusMessage =
-    data.status === "error" ? "No se pudieron cargar los elementos del lienzo."
-    : data.status === "unauthenticated" ? "Inicia sesión para ver tu lienzo."
-    : data.status === "unconfigured" ? "Configura Supabase para usar el lienzo."
-    : null;
+export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
+  const [items, setItems] = useState(initialItems);
   const [message, setMessage] = useState<string | null>(null);
-  const activeMessage = message ?? statusMessage;
-  const [expandedImage, setExpandedImage] = useState<HomeCanvasItem | null>(null);
+  const [expandedImage, setExpandedImage] = useState<OrbitItem | null>(null);
   const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
   const cameraRef = useRef(camera);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -114,14 +90,14 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
   const [dragCameraStart, setDragCameraStart] = useState<{ x: number; y: number } | null>(null);
   const sensors = useSensors(useSensor(CanvasPointerSensor, { activationConstraint: { distance: 6 } }));
   const [editingId, setEditingId] = useState<string | null>(null);
-  const canPersist = data.status === "ready";
   const didFitCameraRef = useRef(false);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const rootItems = items.filter((item) => item.parentId === null);
 
   useEffect(() => {
     const node = viewportRef.current;
-    if (!node || data.status !== "ready" || itemsRef.current.length === 0 || didFitCameraRef.current) return;
+    if (!node || itemsRef.current.length === 0 || didFitCameraRef.current) return;
 
     const tryFit = () => {
       if (didFitCameraRef.current) return;
@@ -134,7 +110,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
     const observer = new ResizeObserver(tryFit);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [data.status, items.length]);
+  }, [items.length]);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -171,7 +147,7 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
       const target = event.target;
       if (target instanceof HTMLElement && target.matches("input, textarea, [contenteditable='true']")) return;
       if (event.key.toLowerCase() === "n") { event.preventDefault(); void createItem("note"); }
-      if (event.key.toLowerCase() === "t") { event.preventDefault(); void createItem("task"); }
+      if (event.key.toLowerCase() === "t") { event.preventDefault(); void createItem("list"); }
       if (event.key.toLowerCase() === "i") { event.preventDefault(); imageInput.current?.click(); }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -251,43 +227,33 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
-  async function createItem(kind: "note" | "task") {
+  async function createItem(kind: "note" | "list") {
     const position = nextPosition();
-    const content = kind === "note" ? { body: "", title: "Nota" } : { body: "Nueva tarea", checked: false, title: "Hoy" };
-    if (!canPersist) {
-      const item = localItem({ content, kind, positionX: position.x, positionY: position.y });
-      setItems((current) => [...current, item]);
-      if (kind === "note") setEditingId(item.id);
-      return;
-    }
-    const result = await createHomeCanvasItem({ content, kind, positionX: position.x, positionY: position.y });
+    const result = await createOrbitItem({ kind, spaceId: null, x: position.x, y: position.y });
     if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
-    setItems((current) => [...current, { ...result.item, imageUrl: null }]);
+    setItems((current) => [...current, result.item!]);
     if (kind === "note") setEditingId(result.item.id);
   }
 
   async function createFromText(text: string) {
     const position = nextPosition();
-    const url = safeUrl(text);
-    const kind: HomeCanvasKind = url ? "link" : "note";
-    const content = url ? { title: new URL(url).hostname, url } : { body: text.slice(0, 5000), title: "Texto" };
-    if (!canPersist) {
-      setItems((current) => [...current, localItem({ content, kind, positionX: position.x, positionY: position.y })]);
+    if (isHttpUrl(text)) {
+      const result = await createOrbitItem({ kind: "link", spaceId: null, title: linkTitleFromUrl(text), url: text, x: position.x, y: position.y });
+      if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
+      setItems((current) => [...current, result.item!]);
       return;
     }
-    const result = await createHomeCanvasItem({ content, kind, positionX: position.x, positionY: position.y });
+    const result = await createOrbitItem({ kind: "note", spaceId: null, title: "Texto", x: position.x, y: position.y });
     if (!result.item) { setMessage(result.error ?? "No se pudo crear el elemento."); return; }
-    setItems((current) => [...current, { ...result.item, imageUrl: null }]);
+    const body = documentWithText(text);
+    setItems((current) => [...current, { ...result.item!, body }]);
+    void saveOrbitNote({ body, id: result.item.id, title: result.item.title });
   }
 
   async function uploadImage(file?: File) {
     if (!file) return;
     if (!file.type.match(/^image\/(avif|jpeg|png|webp)$/) || file.size > 10 * 1024 * 1024) { setMessage("Usa JPG, PNG, WebP o AVIF de hasta 10 MB."); return; }
     const position = nextPosition();
-    if (!canPersist) {
-      setItems((current) => [...current, localItem({ content: { title: file.name.replace(/\.[^.]+$/, "") }, imageUrl: URL.createObjectURL(file), kind: "image", positionX: position.x, positionY: position.y })]);
-      return;
-    }
     const supabase = createClient();
     const { data: claims } = await supabase.auth.getClaims();
     const userId = claims?.claims?.sub;
@@ -296,39 +262,43 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage.from("orbit-canvas").upload(path, file, { contentType: file.type, upsert: false });
     if (error) { setMessage("No se pudo subir la imagen. Verifica la migración y vuelve a intentarlo."); return; }
-    const result = await createHomeCanvasItem({ content: { title: file.name.replace(/\.[^.]+$/, "") }, imagePath: path, kind: "image", positionX: position.x, positionY: position.y });
+    const result = await createOrbitItem({ imagePath: path, kind: "image", spaceId: null, title: file.name.replace(/\.[^.]+$/, ""), x: position.x, y: position.y });
     if (!result.item) { await supabase.storage.from("orbit-canvas").remove([path]); setMessage(result.error ?? "No se pudo crear la imagen."); return; }
-    setItems((current) => [...current, { ...result.item, imageUrl: URL.createObjectURL(file) }]);
+    setItems((current) => [...current, { ...result.item!, imageUrl: URL.createObjectURL(file) }]);
   }
 
-  function updateItem(next: HomeCanvasItem) {
-    setItems((current) => current.map((item) => item.id === next.id ? next : item));
-    if (canPersist) void saveHomeCanvasItem({ content: next.content, id: next.id, positionX: next.positionX, positionY: next.positionY });
+  function saveNote(next: { body: Record<string, unknown>; id: string; title: string }) {
+    setItems((current) => current.map((item) => item.id === next.id ? { ...item, ...next } : item));
+    void saveOrbitNote(next);
   }
 
-  async function duplicateItem(item: HomeCanvasItem) {
-    if (!canPersist) { setItems((current) => [...current, { ...item, id: crypto.randomUUID(), positionX: Math.min(92, item.positionX + 4), positionY: Math.min(92, item.positionY + 4) }]); return; }
-    const result = await duplicateHomeCanvasItem(item.id);
+  function moveItem(item: OrbitItem, positionX: number, positionY: number) {
+    setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, positionX, positionY } : candidate));
+    void saveOrbitItemPosition({ id: item.id, x: positionX, y: positionY });
+  }
+
+  async function duplicateItem(item: OrbitItem) {
+    const result = await duplicateOrbitItem(item.id);
     if (!result.item) { setMessage(result.error ?? "No se pudo duplicar el elemento."); return; }
-    setItems((current) => [...current, { ...result.item, imageUrl: item.imageUrl }]);
+    setItems((current) => [...current, { ...result.item!, imageUrl: item.imageUrl }]);
   }
 
-  function deleteItem(item: HomeCanvasItem) {
+  function removeItem(item: OrbitItem) {
     setItems((current) => current.filter((candidate) => candidate.id !== item.id));
-    if (canPersist) void deleteHomeCanvasItem(item.id);
+    void deleteOrbitItem(item.id);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     if (!event.delta.x && !event.delta.y) return;
     const board = boardRef.current;
     if (!board) return;
-    const id = String(event.active.id);
-    const current = items.find((item) => item.id === id);
+    const itemId = String(event.active.id).startsWith("item:") ? String(event.active.id).slice("item:".length) : String(event.active.id);
+    const current = items.find((item) => item.id === itemId);
     if (!current) return;
     const cameraStart = dragCameraStartRef.current;
     const activeCamera = cameraRef.current;
     const cameraOffset = cameraStart ? { x: activeCamera.x - cameraStart.x, y: activeCamera.y - cameraStart.y } : { x: 0, y: 0 };
-    updateItem({ ...current, positionX: clamp(current.positionX + (event.delta.x - cameraOffset.x) / activeCamera.zoom), positionY: clamp(current.positionY + (event.delta.y - cameraOffset.y) / activeCamera.zoom) });
+    moveItem(current, clamp(current.positionX + (event.delta.x - cameraOffset.x) / activeCamera.zoom), clamp(current.positionY + (event.delta.y - cameraOffset.y) / activeCamera.zoom));
   }
 
   return (
@@ -346,15 +316,15 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
         <div className="home-canvas-tools" aria-label="Herramientas del lienzo">
           <span aria-label="Mover (V)" className="home-canvas-tools__current canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" /></span>
           <button aria-label="Crear una nota (N)" className="canvas-tooltip" data-tooltip="Nota · N" onClick={() => void createItem("note")} type="button"><StickyNote aria-hidden="true" /></button>
-          <button aria-label="Crear una tarea (T)" className="canvas-tooltip" data-tooltip="Tarea · T" onClick={() => void createItem("task")} type="button"><CheckSquare2 aria-hidden="true" /></button>
+          <button aria-label="Crear una lista (T)" className="canvas-tooltip" data-tooltip="Lista · T" onClick={() => void createItem("list")} type="button"><CheckSquare2 aria-hidden="true" /></button>
           <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => imageInput.current?.click()} type="button"><ImagePlus aria-hidden="true" /></button>
         </div>
         <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void uploadImage(event.target.files?.[0]); event.target.value = ""; }} ref={imageInput} type="file" />
       </header>
-      {activeMessage ? <p className="home-canvas-message" role="status">{activeMessage}<button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
+      {message ? <p className="home-canvas-message" role="status">{message}<button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <DndContext onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }} onDragMove={keepDraggedItemVisible} onDragStart={() => { const activeCamera = cameraRef.current; didDragRef.current = true; dragCameraStartRef.current = { x: activeCamera.x, y: activeCamera.y }; setDragCameraStart({ x: activeCamera.x, y: activeCamera.y }); }} sensors={sensors}>
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
-          {items.map((item) => <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingId === item.id} item={item} key={item.id} onChange={updateItem} onDelete={deleteItem} onDuplicate={() => void duplicateItem(item)} onEdit={() => setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom} />)}
+          {rootItems.map((item) => <CanvasItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={editingId === item.id} item={item} key={item.id} onDelete={removeItem} onDuplicate={() => void duplicateItem(item)} onEdit={() => setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} onSaveNote={saveNote} zoom={camera.zoom} />)}
         </div>
       </DndContext>
       <div aria-label="Controles de vista" className="canvas-view-controls" role="group">
@@ -362,21 +332,20 @@ export function HomeCanvas({ data }: { data: HomeCanvasData }) {
         <button aria-label="Acercar" className="canvas-tooltip" data-tooltip="Acercar" disabled={camera.zoom >= MAX_ZOOM} onClick={() => changeZoom(camera.zoom + ZOOM_STEP)} type="button"><Plus aria-hidden="true" /></button>
         <button aria-label="Restablecer zoom y posición" className="canvas-tooltip" data-tooltip="Restablecer vista" onClick={resetCamera} type="button"><Maximize2 aria-hidden="true" /></button>
       </div>
-      {expandedImage?.imageUrl ? <div aria-label="Imagen ampliada" aria-modal="true" className="canvas-image-lightbox" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedImage(null); }} role="dialog"><button aria-label="Cerrar imagen" className="canvas-image-lightbox__close" onClick={() => setExpandedImage(null)} type="button"><X aria-hidden="true" /></button><img alt={expandedImage.content.title || "Imagen ampliada"} src={expandedImage.imageUrl} /></div> : null}
+      {expandedImage?.imageUrl ? <div aria-label="Imagen ampliada" aria-modal="true" className="canvas-image-lightbox" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpandedImage(null); }} role="dialog"><button aria-label="Cerrar imagen" className="canvas-image-lightbox__close" onClick={() => setExpandedImage(null)} type="button"><X aria-hidden="true" /></button><img alt={expandedImage.title || "Imagen ampliada"} src={expandedImage.imageUrl} /></div> : null}
     </section>
   );
 }
 
-function CanvasItem({ dragCameraOffset, editing, item, onChange, onDelete, onDuplicate, onEdit, onExpand, zoom }: { dragCameraOffset?: { x: number; y: number }; editing: boolean; item: HomeCanvasItem; onChange: (item: HomeCanvasItem) => void; onDelete: (item: HomeCanvasItem) => void; onDuplicate: () => void; onEdit: () => void; onExpand: () => void; zoom: number }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ disabled: editing, id: item.id });
+function CanvasItem({ dragCameraOffset, editing, item, onDelete, onDuplicate, onEdit, onExpand, onSaveNote, zoom }: { dragCameraOffset?: { x: number; y: number }; editing: boolean; item: OrbitItem; onDelete: (item: OrbitItem) => void; onDuplicate: () => void; onEdit: () => void; onExpand: () => void; onSaveNote: (next: { body: Record<string, unknown>; id: string; title: string }) => void; zoom: number }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ disabled: editing, id: `item:${item.id}` });
   const style = { "--home-x": `${item.positionX}px`, "--home-y": `${item.positionY}px`, transform: transform ? `translate3d(${(transform.x - (dragCameraOffset?.x ?? 0)) / zoom}px, ${(transform.y - (dragCameraOffset?.y ?? 0)) / zoom}px, 0)` : undefined } as CSSProperties;
-  const updateContent = (content: HomeCanvasItem["content"]) => onChange({ ...item, content });
   return <article {...attributes} {...(editing ? {} : listeners)} className={`home-item home-item--${item.kind}${editing ? " is-editing" : ""}`} ref={setNodeRef} style={style}>
     <ElementControls editing={editing} onDelete={() => onDelete(item)} onDuplicate={onDuplicate} onEdit={onEdit} onExpand={item.kind === "image" ? onExpand : undefined} />
-    {item.kind === "image" ? <><img alt="Imagen de tu lienzo" draggable={false} onClick={onExpand} src={item.imageUrl ?? ""} />{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} placeholder="Añade una descripción opcional" /> : null}</> : null}
-    {item.kind === "note" ? editing ? <><input aria-label="Título de la nota" autoFocus data-no-dnd defaultValue={item.content.title ?? "Nota"} onBlur={(event) => updateContent({ ...item.content, title: event.target.value })} onKeyDown={(event) => event.stopPropagation()} /><textarea aria-label="Texto de la nota" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} onKeyDown={(event) => event.stopPropagation()} placeholder="Escribe una idea…" /></> : <><h3>{item.content.title || "Nota"}</h3><p className={item.content.body ? undefined : "is-placeholder"}>{item.content.body || "Escribe una idea…"}</p></> : null}
-    {item.kind === "task" ? <label><input aria-label="Completar tarea" checked={Boolean(item.content.checked)} data-no-dnd onChange={(event) => updateContent({ ...item.content, checked: event.target.checked })} type="checkbox" /><textarea aria-label="Texto de la tarea" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} onKeyDown={(event) => event.stopPropagation()} /></label> : null}
-    {item.kind === "link" && item.content.url ? <><a href={item.content.url} rel="noreferrer" target="_blank"><Link2 aria-hidden="true" /><span><strong>{item.content.title}</strong><small>{item.content.url}</small></span></a>{editing ? <textarea aria-label="Descripción opcional" className="canvas-item-description" data-no-dnd defaultValue={item.content.body ?? ""} onBlur={(event) => updateContent({ ...item.content, body: event.target.value })} placeholder="Añade una descripción opcional" /> : null}</> : null}
+    {item.kind === "image" ? <img alt="Imagen de tu lienzo" draggable={false} onClick={onExpand} src={item.imageUrl ?? ""} /> : null}
+    {item.kind === "note" ? <SheetWidget editing={editing} item={item} onSave={onSaveNote} /> : null}
+    {item.kind === "list" || item.kind === "folder" || item.kind === "countdown" ? <h3>{item.title}</h3> : null}
+    {item.kind === "link" && item.url ? <a href={item.url} rel="noreferrer" target="_blank"><Link2 aria-hidden="true" /><span><strong>{item.title}</strong><small>{item.url}</small></span></a> : null}
   </article>;
 }
 
@@ -386,10 +355,6 @@ function ElementControls({ editing, onDelete, onDuplicate, onEdit, onExpand }: {
 
 function clamp(value: number) { return Math.min(1_000_000, Math.max(-1_000_000, Math.round(value * 100) / 100)); }
 
-function localItem(input: Omit<HomeCanvasItem, "id" | "imagePath" | "imageUrl"> & { imageUrl?: string | null }): HomeCanvasItem {
-  return { ...input, id: crypto.randomUUID(), imagePath: null, imageUrl: input.imageUrl ?? null };
-}
-
-function safeUrl(value: string) {
-  try { const url = new URL(value); return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null; } catch { return null; }
+function documentWithText(text: string) {
+  return { content: text.slice(0, 5000).split(/\r?\n/).filter(Boolean).map((line) => ({ content: [{ text: line, type: "text" }], type: "paragraph" })), type: "doc" };
 }

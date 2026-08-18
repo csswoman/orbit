@@ -1,11 +1,11 @@
 import { HomeCanvas } from "@/components/home/home-canvas";
-import { getHomeCanvas } from "@/lib/home-canvas";
+import { getOrbitItems } from "@/lib/orbit-items";
 
 export default async function HomePage() {
-  const data = await getHomeCanvas();
+  const items = await getOrbitItems(null);
   return (
     <section className="canvas-page">
-      <HomeCanvas data={data} />
+      <HomeCanvas items={items} />
     </section>
   );
 }
