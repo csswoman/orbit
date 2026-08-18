@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import {
   saveSpaceItem,
@@ -35,6 +35,7 @@ export function ResourceForm({
   );
   const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     if (mode === "create" && state.status === "success") {
@@ -70,7 +71,9 @@ export function ResourceForm({
               idPrefix={formId}
               initialValue={initialValues?.[field.key]}
               key={field.key}
+              onImageUploadingChange={setImageUploading}
               relationOptions={relationOptions}
+              resetKey={mode === "create" ? state.resetKey : undefined}
             />
           ))}
       </div>
@@ -84,7 +87,7 @@ export function ResourceForm({
       <div className="flex flex-wrap items-center gap-3">
         <button
           className="min-h-11 rounded-lg bg-[var(--orbit-accent)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={pending || Boolean(missingRelation)}
+          disabled={pending || imageUploading || Boolean(missingRelation)}
           type="submit"
         >
           {pending
@@ -112,12 +115,16 @@ function FormField({
   field,
   idPrefix,
   initialValue,
+  onImageUploadingChange,
   relationOptions,
+  resetKey,
 }: {
   field: CrudField;
   idPrefix: string;
   initialValue: unknown;
+  onImageUploadingChange?: (uploading: boolean) => void;
   relationOptions: Record<string, RelationOption[]>;
+  resetKey?: number;
 }) {
   const id = `${idPrefix}-${field.key}`;
   const fieldClass = field.type === "textarea" ? "sm:col-span-2" : undefined;
@@ -131,6 +138,8 @@ function FormField({
         initialPath={initialValue ? String(initialValue) : null}
         label={field.label}
         name={field.key}
+        onUploadingChange={onImageUploadingChange}
+        resetKey={resetKey}
       />
     );
   }

@@ -43,3 +43,14 @@ export async function uploadCanvasImage(file: File): Promise<{
     return { error: "Imagen no válida." };
   }
 }
+
+export async function deleteCanvasImage(path: string | null | undefined): Promise<void> {
+  if (!path) return;
+
+  const supabase = createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims?.sub;
+  if (!userId || !path.startsWith(`${userId}/`)) return;
+
+  await supabase.storage.from(CANVAS_BUCKET).remove([path]);
+}

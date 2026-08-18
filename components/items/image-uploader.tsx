@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import {
   CANVAS_BUCKET,
+  deleteCanvasImage,
   uploadCanvasImage,
 } from "@/lib/upload-canvas-image";
 
@@ -14,6 +15,8 @@ type ImageUploaderProps = {
   label?: string;
   name: string;
   onPathChange?: (path: string | null) => void;
+  onUploadingChange?: (uploading: boolean) => void;
+  resetKey?: number;
 };
 
 export function ImageUploader({
@@ -21,17 +24,24 @@ export function ImageUploader({
   label = "Imagen",
   name,
   onPathChange,
+  onUploadingChange,
+  resetKey,
 }: ImageUploaderProps) {
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
+  const pendingPathRef = useRef<string | null>(null);
   const [path, setPath] = useState(initialPath ? String(initialPath) : "");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [onUploadingChange, uploading]);
+
+  useEffect(() => {
     let cancelled = false;
-    let objectUrl: string | null = null;
 
     async function loadPreview() {
       if (!initialPath) {
@@ -56,9 +66,46 @@ export function ImageUploader({
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [initialPath]);
+
+  useEffect(() => {
+    if (resetKey === undefined) return;
+
+    pendingPathRef.current = null;
+    if (blobUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setPath("");
+    setPreviewUrl(null);
+    setError(null);
+    onPathChange?.(null);
+  }, [onPathChange, resetKey]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current?.startsWith("blob:")) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      void deleteCanvasImage(pendingPathRef.current);
+    };
+  }, []);
+
+  function setBlobPreview(url: string | null) {
+    if (blobUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(blobUrlRef.current);
+    }
+    blobUrlRef.current = url?.startsWith("blob:") ? url : null;
+    setPreviewUrl(url);
+  }
+
+  async function abandonPendingPath() {
+    const pending = pendingPathRef.current;
+    if (!pending) return;
+    pendingPathRef.current = null;
+    await deleteCanvasImage(pending);
+  }
 
   async function handleFile(file?: File) {
     if (!file) return;
@@ -74,16 +121,17 @@ export function ImageUploader({
       return;
     }
 
-    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    await abandonPendingPath();
+    pendingPathRef.current = result.path;
     setPath(result.path);
-    setPreviewUrl(result.previewUrl ?? null);
+    setBlobPreview(result.previewUrl ?? null);
     onPathChange?.(result.path);
   }
 
-  function clearImage() {
-    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+  async function clearImage() {
+    await abandonPendingPath();
     setPath("");
-    setPreviewUrl(null);
+    setBlobPreview(null);
     onPathChange?.(null);
   }
 
@@ -101,7 +149,9 @@ export function ImageUploader({
           <button
             aria-label="Quitar imagen"
             className="absolute right-2 top-2 rounded-md bg-black/60 p-1.5 text-white"
-            onClick={clearImage}
+            onClick={() => {
+              void clearImage();
+            }}
             type="button"
           >
             <Trash2 aria-hidden="true" className="size-4" />
