@@ -1,7 +1,10 @@
 import "server-only";
 
 import { isSupabaseConfigured } from "@/lib/env";
+import { emptyDocument } from "@/lib/orbit-item";
 import { createClient } from "@/lib/supabase/server";
+
+export { emptyDocument };
 
 export type CanvasFont = "classic" | "grotesk" | "soft";
 export type CanvasLayout = "free" | "order";
@@ -35,6 +38,26 @@ export const defaultCanvasPreference: CanvasPreference = {
   theme: "aurora",
 };
 
+export async function getCanvasPreference(spaceId: string): Promise<CanvasPreference> {
+  if (!isSupabaseConfigured()) return defaultCanvasPreference;
+
+  try {
+    const supabase = await createClient();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    if (!claimsData?.claims?.sub) return defaultCanvasPreference;
+
+    const { data: preference } = await supabase
+      .from("space_preferences")
+      .select("canvas_layout, canvas_theme, canvas_font, canvas_positions")
+      .eq("space_id", spaceId)
+      .maybeSingle();
+
+    return normalizePreference(preference);
+  } catch {
+    return defaultCanvasPreference;
+  }
+}
+
 export async function getSpaceCanvas(spaceId: string): Promise<{
   preference: CanvasPreference;
   widgets: SpaceWidget[];
@@ -50,17 +73,13 @@ export async function getSpaceCanvas(spaceId: string): Promise<{
       return { preference: defaultCanvasPreference, widgets: [] };
     }
 
-    const [{ data: preference }, { data: widgets }] = await Promise.all([
-      supabase
-        .from("space_preferences")
-        .select("canvas_layout, canvas_theme, canvas_font, canvas_positions")
-        .eq("space_id", spaceId)
-        .maybeSingle(),
+    const [{ data: widgets }, preference] = await Promise.all([
       supabase
         .from("space_widgets")
         .select("id, widget_type, title, content, image_path, link_url, position_x, position_y, width, height")
         .eq("space_id", spaceId)
         .order("updated_at", { ascending: false }),
+      getCanvasPreference(spaceId),
     ]);
 
     const signedUrls = await Promise.all((widgets ?? []).map(async (widget) => {
@@ -70,7 +89,7 @@ export async function getSpaceCanvas(spaceId: string): Promise<{
     }));
 
     return {
-      preference: normalizePreference(preference),
+      preference,
       widgets: (widgets ?? []).map((widget, index) => ({
         content: isObject(widget.content) ? widget.content : emptyDocument(),
         height: Number(widget.height),
@@ -88,10 +107,6 @@ export async function getSpaceCanvas(spaceId: string): Promise<{
   } catch {
     return { preference: defaultCanvasPreference, widgets: [] };
   }
-}
-
-export function emptyDocument() {
-  return { content: [{ type: "paragraph" }], type: "doc" };
 }
 
 function normalizePreference(value: unknown): CanvasPreference {

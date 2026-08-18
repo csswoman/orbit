@@ -13,6 +13,7 @@ const spaceKinds = [
   { icon: "shirt", kind: "clothing", label: "Ropa" },
   { icon: "luggage", kind: "travel", label: "Viajes" },
   { icon: "tag", kind: "sales", label: "Ventas" },
+  { icon: "briefcase", kind: "jobs", label: "Trabajo" },
   { icon: "folder-kanban", kind: "projects", label: "Proyectos" },
   { icon: "sparkles", kind: "inspiration", label: "Inspiración" },
 ] as const;

@@ -5,18 +5,18 @@ import StarterKit from "@tiptap/starter-kit";
 import { Bold, Heading2, Italic, List } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import type { SpaceWidget } from "@/lib/space-widgets";
+import type { OrbitItem } from "@/lib/orbit-item";
 
-export function SheetWidget({ editing, onSave, widget }: {
+export function SheetWidget({ editing, onSave, item }: {
   editing: boolean;
-  onSave: (widget: { content: Record<string, unknown>; id: string; title: string }) => void;
-  widget: SpaceWidget;
+  item: OrbitItem;
+  onSave: (item: { body: Record<string, unknown>; id: string; title: string }) => void;
 }) {
-  const [title, setTitle] = useState(widget.title);
-  const latestContent = useRef(widget.content);
+  const [title, setTitle] = useState(item.title);
+  const latestContent = useRef(item.body);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const editor = useEditor({
-    content: widget.content,
+    content: item.body,
     editable: editing,
     editorProps: {
       handleKeyDown: (_view, event) => {
@@ -44,7 +44,7 @@ export function SheetWidget({ editing, onSave, widget }: {
 
   function scheduleSave(nextTitle = title) {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => onSave({ content: latestContent.current, id: widget.id, title: nextTitle }), 700);
+    timer.current = setTimeout(() => onSave({ body: latestContent.current, id: item.id, title: nextTitle }), 700);
   }
 
   return (

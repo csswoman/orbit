@@ -1,10 +1,11 @@
 import { GachaGameCreator, GachaWorkspace } from "@/components/spaces/gacha-workspace";
 import { ResourceSection } from "@/components/spaces/resource-section";
 import { SpaceCanvas } from "@/components/spaces/space-canvas";
+import type { OrbitItem } from "@/lib/orbit-item";
+import type { OrbitSpace } from "@/lib/orbit-spaces";
 import type { SpaceCrudConfig, SpaceKind } from "@/lib/space-crud";
 import type { RelationOption, ResourceData } from "@/lib/space-data";
-import type { OrbitSpace } from "@/lib/orbit-spaces";
-import type { CanvasPreference, SpaceWidget } from "@/lib/space-widgets";
+import type { CanvasPreference } from "@/lib/space-widgets";
 
 export function SpaceWorkspace({
   config,
@@ -15,7 +16,7 @@ export function SpaceWorkspace({
   resourcesData,
   preference,
   space,
-  widgets,
+  items,
 }: {
   config: SpaceCrudConfig;
   kind: SpaceKind;
@@ -25,7 +26,7 @@ export function SpaceWorkspace({
   resourcesData: ResourceData[];
   preference: CanvasPreference;
   space: string;
-  widgets: SpaceWidget[];
+  items: OrbitItem[];
 }) {
   return (
     <>
@@ -36,10 +37,10 @@ export function SpaceWorkspace({
             <GachaGameCreator config={config} relationOptions={relationOptions} space={space} />
           ) : undefined
         }
+        items={items}
         preference={preference}
         space={space}
         spaceDetails={spaceDetails}
-        widgets={widgets}
       >
         {kind === "gacha" ? (
           <GachaWorkspace

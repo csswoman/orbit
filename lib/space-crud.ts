@@ -2,6 +2,7 @@ export type CrudFieldType =
   | "checkbox"
   | "date"
   | "datetime-local"
+  | "image"
   | "number"
   | "select"
   | "tags"
@@ -56,6 +57,7 @@ export type SpaceKind =
   | "clothing"
   | "travel"
   | "sales"
+  | "jobs"
   | "projects"
   | "inspiration";
 
@@ -275,7 +277,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
           },
           { key: "status", label: "Estado", options: statusOptions.wishlist, required: true, type: "select" },
           { key: "url", label: "Enlace", type: "url" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
           { key: "notes", label: "Notas", type: "textarea" },
         ],
         key: "items",
@@ -290,100 +292,19 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
   },
   clothing: {
     description: "Lleva un inventario simple de ropa y reemplazos pendientes.",
-    resources: [
-      {
-        description: "Prendas organizadas por categoría.",
-        emptyMessage: "Todavía no agregaste prendas.",
-        fields: [
-          { key: "category", label: "Categoría", required: true, type: "text" },
-          { key: "name", label: "Nombre", type: "text" },
-          { key: "needs_replacement", label: "Necesita reemplazo", type: "checkbox" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
-          { key: "notes", label: "Notas", type: "textarea" },
-        ],
-        key: "items",
-        orderBy: "category",
-        singular: "prenda",
-        table: "clothing_items",
-        title: "Ropa",
-        titleField: "name",
-      },
-    ],
+    resources: [],
   },
   travel: {
     description: "Prepara maletas reutilizables y marca lo que ya empacaste.",
-    resources: [
-      {
-        description: "Crea una maleta por viaje o por tipo de salida.",
-        emptyMessage: "Todavía no tienes maletas.",
-        fields: [
-          { key: "name", label: "Nombre", required: true, type: "text" },
-          { key: "trip_name", label: "Viaje", type: "text" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
-        ],
-        key: "bags",
-        orderBy: "created_at",
-        orderDirection: "desc",
-        singular: "maleta",
-        table: "travel_bags",
-        title: "Maletas",
-        titleField: "name",
-      },
-      {
-        description: "Contenido de cada maleta y estado de empaque.",
-        emptyMessage: "Agrega artículos a una maleta.",
-        fields: [
-          {
-            key: "bag_id",
-            label: "Maleta",
-            optionsFrom: { labelField: "name", resource: "bags" },
-            required: true,
-            type: "select",
-          },
-          { key: "name", label: "Artículo", required: true, type: "text" },
-          { key: "packed", label: "Empacado", type: "checkbox" },
-        ],
-        key: "items",
-        orderBy: "created_at",
-        orderDirection: "desc",
-        singular: "artículo",
-        table: "bag_items",
-        title: "Artículos",
-        titleField: "name",
-      },
-    ],
+    resources: [],
   },
   sales: {
     description: "Registra lo que quieres vender y lo que ya salió.",
-    resources: [
-      {
-        description: "Artículos disponibles o vendidos.",
-        emptyMessage: "Todavía no agregaste artículos para vender.",
-        fields: [
-          { key: "name", label: "Nombre", required: true, type: "text" },
-          { key: "price", label: "Precio", step: "0.01", type: "number" },
-          {
-            key: "status",
-            label: "Estado",
-            options: [
-              { label: "Disponible", value: "available" },
-              { label: "Vendido", value: "sold" },
-            ],
-            required: true,
-            type: "select",
-          },
-          { key: "image_url", label: "URL de imagen", type: "url" },
-          { key: "notes", label: "Notas", type: "textarea" },
-        ],
-        key: "items",
-        orderBy: "created_at",
-        orderDirection: "desc",
-        singular: "artículo",
-        table: "sale_items",
-        title: "Ventas",
-        titleField: "name",
-      },
-    ],
+    resources: [],
+  },
+  jobs: {
+    description: "Guarda ofertas, estados de postulación y notas de entrevistas.",
+    resources: [],
   },
   projects: {
     description: "Captura ideas, dales estado y deja que Orbit las vuelva a mostrar.",
@@ -396,7 +317,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
           { key: "description", label: "Descripción", type: "textarea" },
           { key: "status", label: "Estado", options: statusOptions.project, required: true, type: "select" },
           { key: "color", label: "Color hexadecimal", placeholder: "#4F46E5", type: "text" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
         ],
         key: "items",
         orderBy: "updated_at",
@@ -435,7 +356,7 @@ export const spaceCrudConfigs: Record<string, SpaceCrudConfig> = {
             type: "select",
           },
           { key: "source_url", label: "Enlace de origen", type: "url" },
-          { key: "image_url", label: "URL de imagen", type: "url" },
+          { key: "image_path", label: "Imagen", type: "image" },
           { key: "note", label: "Nota", type: "textarea" },
           { key: "tags", label: "Etiquetas", placeholder: "arte, interfaz, color", type: "tags" },
         ],

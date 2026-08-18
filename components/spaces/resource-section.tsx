@@ -114,7 +114,7 @@ function ResourceItem({
 }) {
   const title = String(item[resource.titleField] || resource.singular);
   const summaryFields = resource.fields
-    .filter((field) => !["textarea", "url"].includes(field.type))
+    .filter((field) => !["image", "textarea", "url"].includes(field.type))
     .filter((field) => !hiddenFieldKeys.includes(field.key))
     .filter((field) => field.key !== resource.titleField)
     .filter((field) => item[field.key] !== null && item[field.key] !== "")

@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import {
   saveSpaceItem,
   type CrudActionState,
 } from "@/app/(app)/space-actions";
+import { ImageUploader } from "@/components/items/image-uploader";
 import type { CrudField, CrudResource } from "@/lib/space-crud";
 import type { RelationOption } from "@/lib/space-data";
 
@@ -34,6 +35,7 @@ export function ResourceForm({
   );
   const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     if (mode === "create" && state.status === "success") {
@@ -69,7 +71,9 @@ export function ResourceForm({
               idPrefix={formId}
               initialValue={initialValues?.[field.key]}
               key={field.key}
+              onImageUploadingChange={setImageUploading}
               relationOptions={relationOptions}
+              resetKey={mode === "create" ? state.resetKey : undefined}
             />
           ))}
       </div>
@@ -83,7 +87,7 @@ export function ResourceForm({
       <div className="flex flex-wrap items-center gap-3">
         <button
           className="min-h-11 rounded-lg bg-[var(--orbit-accent)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={pending || Boolean(missingRelation)}
+          disabled={pending || imageUploading || Boolean(missingRelation)}
           type="submit"
         >
           {pending
@@ -111,18 +115,34 @@ function FormField({
   field,
   idPrefix,
   initialValue,
+  onImageUploadingChange,
   relationOptions,
+  resetKey,
 }: {
   field: CrudField;
   idPrefix: string;
   initialValue: unknown;
+  onImageUploadingChange?: (uploading: boolean) => void;
   relationOptions: Record<string, RelationOption[]>;
+  resetKey?: number;
 }) {
   const id = `${idPrefix}-${field.key}`;
   const fieldClass = field.type === "textarea" ? "sm:col-span-2" : undefined;
   const options = field.optionsFrom
     ? relationOptions[field.optionsFrom.resource] ?? []
     : field.options ?? [];
+
+  if (field.type === "image") {
+    return (
+      <ImageUploader
+        initialPath={initialValue ? String(initialValue) : null}
+        label={field.label}
+        name={field.key}
+        onUploadingChange={onImageUploadingChange}
+        resetKey={resetKey}
+      />
+    );
+  }
 
   if (field.type === "checkbox") {
     return (

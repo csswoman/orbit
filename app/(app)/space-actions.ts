@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const COLOR_PATTERN = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
+const CANVAS_BUCKET = "orbit-canvas";
 
 async function getOwnedSpace(spaceId: string, userId: string) {
   if (!UUID_PATTERN.test(spaceId)) return null;
@@ -36,7 +37,7 @@ function error(message: string): CrudActionState {
   return { message, status: "error" };
 }
 
-function parseField(field: CrudField, formData: FormData) {
+function parseField(field: CrudField, formData: FormData, userId: string) {
   if (field.type === "checkbox") {
     return formData.get(field.key) === "on";
   }
@@ -80,6 +81,16 @@ function parseField(field: CrudField, formData: FormData) {
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw new Error(`${field.label} debe comenzar con http:// o https://.`);
     }
+  }
+
+  if (field.type === "image") {
+    if (!raw.startsWith(`${userId}/`)) {
+      throw new Error(`${field.label} no es válida.`);
+    }
+    if (raw.length > 512) {
+      throw new Error(`${field.label} es demasiado larga.`);
+    }
+    return raw;
   }
 
   if (field.key === "color" && !COLOR_PATTERN.test(raw)) {
@@ -134,17 +145,84 @@ function validateCombinedData(resourceKey: string, data: Record<string, unknown>
   }
 
   if ("source_type" in data) {
-    const hasContent = [data.title, data.image_url, data.source_url, data.note].some(Boolean);
+    const hasContent = [
+      data.title,
+      data.image_path,
+      data.image_url,
+      data.source_url,
+      data.note,
+    ].some(Boolean);
     if (!hasContent) {
       throw new Error("Agrega un título, una imagen, un enlace o una nota.");
     }
     if (data.source_type === "url" && !data.source_url) {
       throw new Error("Una inspiración de enlace necesita su URL de origen.");
     }
-    if (data.source_type === "sketch" && !data.image_url) {
-      throw new Error("Un boceto necesita la URL de su imagen.");
+    if (data.source_type === "sketch" && !data.image_path && !data.image_url) {
+      throw new Error("Un boceto necesita su imagen.");
     }
   }
+}
+
+function applyImageFieldEdits(
+  resource: { fields: readonly CrudField[] },
+  values: Record<string, unknown>,
+  formData: FormData,
+  existingRow: Record<string, unknown> | null,
+) {
+  for (const field of resource.fields) {
+    if (field.type !== "image") continue;
+
+    const submittedRaw = String(formData.get(field.key) ?? "").trim();
+    const existingPath = existingRow?.[field.key];
+
+    if (existingRow) {
+      if (!submittedRaw) {
+        if (existingPath) {
+          values[field.key] = null;
+        } else {
+          delete values[field.key];
+        }
+      }
+    }
+  }
+}
+
+function buildValidationData(
+  resource: { fields: readonly CrudField[] },
+  values: Record<string, unknown>,
+  existingRow: Record<string, unknown> | null,
+) {
+  const validationData = { ...values };
+
+  if (!existingRow) return validationData;
+
+  for (const field of resource.fields) {
+    if (field.type !== "image") continue;
+    if (validationData[field.key]) continue;
+    if (existingRow[field.key]) {
+      validationData[field.key] = existingRow[field.key];
+    }
+  }
+
+  if (!validationData.image_path && existingRow.image_path) {
+    validationData.image_path = existingRow.image_path;
+  }
+  if (!validationData.image_url && existingRow.image_url) {
+    validationData.image_url = existingRow.image_url;
+  }
+
+  return validationData;
+}
+
+async function removeOwnedCanvasPath(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  path: unknown,
+) {
+  const storagePath = String(path ?? "");
+  if (!storagePath.startsWith(`${userId}/`)) return;
+  await supabase.storage.from(CANVAS_BUCKET).remove([storagePath]);
 }
 
 export async function saveSpaceItem(
@@ -170,12 +248,29 @@ export async function saveSpaceItem(
   const resource = ownedSpace ? getCrudResource(String(ownedSpace.kind), resourceKey) : undefined;
   if (!resource) return error("El espacio ya no está disponible.");
 
+  let existingRow: Record<string, unknown> | null = null;
+  if (id) {
+    const { data: existing } = await supabase
+      .from(resource.table)
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .eq("space_id", space)
+      .maybeSingle();
+    if (!existing) return error("El elemento ya no está disponible.");
+    existingRow = existing;
+  }
+
   let values: Record<string, unknown>;
   try {
     values = Object.fromEntries(
-      resource.fields.map((field) => [field.key, parseField(field, formData)]),
+      resource.fields.map((field) => [field.key, parseField(field, formData, userId)]),
     );
-    validateCombinedData(resourceKey, values);
+    applyImageFieldEdits(resource, values, formData, existingRow);
+    validateCombinedData(
+      resourceKey,
+      buildValidationData(resource, values, existingRow),
+    );
   } catch (validationError) {
     return error(
       validationError instanceof Error
@@ -208,6 +303,17 @@ export async function saveSpaceItem(
       resource: resource.table,
     });
     return error("No se pudo guardar. Revisa los datos e inténtalo otra vez.");
+  }
+
+  if (existingRow) {
+    for (const field of resource.fields) {
+      if (field.type !== "image") continue;
+      const oldPath = existingRow[field.key];
+      const newPath = values[field.key];
+      if (oldPath && newPath !== oldPath) {
+        await removeOwnedCanvasPath(supabase, userId, oldPath);
+      }
+    }
   }
 
   revalidatePath(`/spaces/${space}`);
