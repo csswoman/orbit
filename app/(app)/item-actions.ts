@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { canCreateChild, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
+import { applyOrbitLinkPreview, fetchOg, type OgPreview } from "@/lib/link-preview";
 import {
   defaultSize,
   emptyDocument,
@@ -259,6 +260,24 @@ export async function duplicateOrbitItem(id: string): Promise<{ error?: string; 
   if (error || !data) return { error: "No se pudo duplicar el elemento." };
   revalidateItemPath(row.space_id);
   return { item: mapOrbitItemRow(data as OrbitItemRow) };
+}
+
+export async function hydrateLinkPreview(id: string): Promise<{ error?: string; item?: OrbitItem }> {
+  if (!UUID_PATTERN.test(id)) return { error: "Elemento no válido." };
+  const { supabase, userId } = await getAuthenticatedClient();
+  const result = await applyOrbitLinkPreview({ id, supabase, userId });
+  if (result.item) revalidateItemPath(result.item.spaceId);
+  return result;
+}
+
+export async function retryLinkPreview(id: string): Promise<{ error?: string; item?: OrbitItem }> {
+  return hydrateLinkPreview(id);
+}
+
+export async function previewUrl(url: string): Promise<OgPreview> {
+  await getAuthenticatedClient();
+  if (!isHttpUrl(url)) return { description: null, image: null, title: null };
+  return fetchOg(url);
 }
 
 function resolveTitle(input: {

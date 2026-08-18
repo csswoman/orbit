@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from "react";
 
-import { addChildItem, createOrbitItem, deleteOrbitItem, duplicateOrbitItem, saveCheckItem, saveOrbitCover, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
+import { addChildItem, createOrbitItem, deleteOrbitItem, duplicateOrbitItem, hydrateLinkPreview, saveCheckItem, saveOrbitCover, saveOrbitItemPosition, saveOrbitNote } from "@/app/(app)/item-actions";
 import { shouldClearPendingImageParent } from "@/lib/image-picker";
 import { parentIdForCreate, type ItemKind } from "@/lib/item-nesting";
 import { isHttpUrl, linkTitleFromUrl } from "@/lib/item-url";
@@ -81,9 +81,20 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     return item;
   }
 
+  async function hydrateCreatedLink(item: OrbitItem | null) {
+    if (!item) return;
+    const result = await hydrateLinkPreview(item.id);
+    if (result.item) applyItem(result.item);
+  }
+
+  function applyItem(item: OrbitItem) {
+    setItems((current) => patchOrbitItem(current, item.id, item));
+  }
+
   async function addFromText(text: string) {
     if (isHttpUrl(text)) {
-      await createItem("link", { title: linkTitleFromUrl(text), url: text });
+      const item = await createItem("link", { title: linkTitleFromUrl(text), url: text });
+      await hydrateCreatedLink(item);
       return;
     }
     await createItem("note", { body: documentWithText(text), title: "Texto" });
@@ -97,10 +108,12 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
       return;
     }
     if (parentId) {
-      await createAt({ kind: "link", parentId, spaceId, title: linkTitleFromUrl(raw), url: raw, x: 0, y: 0 });
+      const item = await createAt({ kind: "link", parentId, spaceId, title: linkTitleFromUrl(raw), url: raw, x: 0, y: 0 });
+      await hydrateCreatedLink(item);
       return;
     }
-    await createItem("link", { title: linkTitleFromUrl(raw), url: raw });
+    const item = await createItem("link", { title: linkTitleFromUrl(raw), url: raw });
+    await hydrateCreatedLink(item);
   }
 
   async function addImage(file?: File) {
@@ -209,6 +222,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     addChild,
     addImage,
     addLink,
+    applyItem,
     clearPendingImageParent,
     closeFolder(id: string, parentId: string | null) {
       if (openFolderId !== id) return;

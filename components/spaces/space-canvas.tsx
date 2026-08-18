@@ -196,7 +196,7 @@ export function SpaceCanvas({ adjustmentContent, children, items: initialItems, 
                     position={getPosition(id, preference, canvas.items, resourceChildren.length + index)}
                     zoom={camera.zoom}
                   >
-                    <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChangeCover={canvas.openCoverPicker} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={expandImage} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={spaceDetails.kind} />
+                    <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChangeCover={canvas.openCoverPicker} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={expandImage} onItemUpdated={canvas.applyItem} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={spaceDetails.kind} />
                   </DraggableWidget>
                 );
               })}

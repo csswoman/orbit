@@ -7,6 +7,7 @@ import {
   type CrudActionState,
 } from "@/app/(app)/space-actions";
 import { ImageUploader } from "@/components/items/image-uploader";
+import { UrlOgPreview } from "@/components/items/url-og-preview";
 import type { CrudField, CrudResource } from "@/lib/space-crud";
 import type { RelationOption } from "@/lib/space-data";
 
@@ -197,6 +198,15 @@ function FormField({
             </option>
           ))}
         </select>
+      ) : field.type === "url" ? (
+        <UrlOgPreview
+          defaultValue={defaultValue}
+          id={id}
+          name={field.key}
+          placeholder={field.placeholder}
+          required={field.required}
+          resetKey={resetKey}
+        />
       ) : (
         <input
           className="min-h-11 rounded-lg border border-[var(--orbit-line)] bg-[var(--orbit-background)] px-3 py-2 font-normal outline-none focus:border-[var(--orbit-accent)] focus:ring-2 focus:ring-[var(--orbit-accent-soft)]"
