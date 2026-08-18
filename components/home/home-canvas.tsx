@@ -162,10 +162,10 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
           <button aria-label="Crear una carpeta" className="canvas-tooltip" data-tooltip="Carpeta" onClick={() => void canvas.createItem("folder")} type="button"><Folder aria-hidden="true" /></button>
           <button aria-label="Crear una lista (T)" className="canvas-tooltip" data-tooltip="Lista · T" onClick={() => void canvas.createItem("list")} type="button"><CheckSquare2 aria-hidden="true" /></button>
           <button aria-label="Crear una nota (N)" className="canvas-tooltip" data-tooltip="Nota · N" onClick={() => void canvas.createItem("note")} type="button"><StickyNote aria-hidden="true" /></button>
-          <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => imageInput.current?.click()} type="button"><ImagePlus aria-hidden="true" /></button>
+          <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => { canvas.clearPendingImageParent(); imageInput.current?.click(); }} type="button"><ImagePlus aria-hidden="true" /></button>
           <button aria-label="Añadir un enlace" className="canvas-tooltip" data-tooltip="Enlace" onClick={() => void canvas.addLink()} type="button"><Link2 aria-hidden="true" /></button>
         </div>
-        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { void canvas.addImage(event.target.files?.[0]); event.target.value = ""; }} ref={imageInput} type="file" />
+        <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (!file) canvas.clearPendingImageParent(); void canvas.addImage(file); event.target.value = ""; }} ref={imageInput} type="file" />
       </header>
       {canvas.message ? <p className="home-canvas-message" role="status">{canvas.message}<button aria-label="Cerrar mensaje" onClick={() => canvas.setMessage(null)} type="button"><X aria-hidden="true" /></button></p> : null}
       <DndContext onDragEnd={(event) => { handleDragEnd(event); window.setTimeout(() => { didDragRef.current = false; dragCameraStartRef.current = null; setDragCameraStart(null); }, 0); }} onDragMove={keepDraggedItemVisible} onDragStart={() => { const activeCamera = cameraRef.current; didDragRef.current = true; dragCameraStartRef.current = { x: activeCamera.x, y: activeCamera.y }; setDragCameraStart({ x: activeCamera.x, y: activeCamera.y }); }} sensors={sensors}>

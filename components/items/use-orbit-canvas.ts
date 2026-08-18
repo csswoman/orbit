@@ -21,6 +21,10 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
   const [message, setMessage] = useState<string | null>(null);
   const imageParentRef = useRef<string | null>(null);
 
+  function clearPendingImageParent() {
+    imageParentRef.current = null;
+  }
+
   function resolveParent(kind: ItemKind) {
     const open = openFolderId ? findOrbitItem(items, openFolderId) : null;
     if (!open || (open.kind !== "folder" && open.kind !== "list")) return null;
@@ -133,7 +137,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
       if (target instanceof HTMLElement && target.matches("input, textarea, [contenteditable='true']")) return;
       if (event.key.toLowerCase() === "n") { event.preventDefault(); void createItem("note"); }
       if (event.key.toLowerCase() === "t") { event.preventDefault(); void createItem("list"); }
-      if (event.key.toLowerCase() === "i") { event.preventDefault(); imageInput.current?.click(); }
+      if (event.key.toLowerCase() === "i") { event.preventDefault(); clearPendingImageParent(); imageInput.current?.click(); }
     };
     const onPaste = (event: ClipboardEvent) => {
       const target = event.target;
@@ -155,6 +159,7 @@ export function useOrbitCanvas({ getPosition, imageInput, initialItems, spaceId 
     addChild,
     addImage,
     addLink,
+    clearPendingImageParent,
     childAdded(parentId: string, child: OrbitItem) { place(parentId, child); },
     createItem,
     creating,
