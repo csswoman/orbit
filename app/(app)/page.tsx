@@ -1,11 +1,25 @@
 import { HomeCanvas } from "@/components/home/home-canvas";
-import { getOrbitItems } from "@/lib/orbit-items";
+import { HomeSummaries } from "@/components/home/home-summaries";
+import { HomeUpcoming } from "@/components/home/home-upcoming";
+import { getDashboardData } from "@/lib/dashboard";
+import { getHomeSummaries, getOrbitItems } from "@/lib/orbit-items";
 
 export default async function HomePage() {
-  const items = await getOrbitItems(null);
+  const [canvas, dashboard, summaries] = await Promise.all([
+    getOrbitItems(null),
+    getDashboardData(),
+    getHomeSummaries(),
+  ]);
+
   return (
     <section className="canvas-page">
-      <HomeCanvas items={items} />
+      <div className="home-hud">
+        <HomeUpcoming
+          state={dashboard.status === "ready" ? dashboard.upcoming : { status: "error" }}
+        />
+        {summaries ? <HomeSummaries summaries={summaries} /> : null}
+      </div>
+      <HomeCanvas items={canvas} />
     </section>
   );
 }

@@ -2,9 +2,10 @@
 /* eslint-disable @next/next/no-img-element -- signed, user-uploaded URLs cannot be declared as fixed Next image hosts. */
 
 import { DndContext, useDraggable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
-import { CheckSquare2, Folder, ImagePlus, Link2, Maximize2, Minus, MousePointer2, Plus, StickyNote, X } from "lucide-react";
+import { Maximize2, Minus, MousePointer2, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+import { AddItemPicker } from "@/components/items/add-item-picker";
 import { OrbitCanvasItem, WidgetControls } from "@/components/items/canvas-item";
 import { CanvasPointerSensor } from "@/components/items/canvas-pointer-sensor";
 import { useOrbitCanvas } from "@/components/items/use-orbit-canvas";
@@ -159,11 +160,13 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
       <header className="home-canvas-toolbar">
         <div className="home-canvas-tools" aria-label="Herramientas del lienzo">
           <span aria-label="Mover (V)" className="home-canvas-tools__current canvas-tooltip" data-tooltip="Mover · V"><MousePointer2 aria-hidden="true" /></span>
-          <button aria-label="Crear una carpeta" className="canvas-tooltip" data-tooltip="Carpeta" onClick={() => void canvas.createItem("folder")} type="button"><Folder aria-hidden="true" /></button>
-          <button aria-label="Crear una lista (T)" className="canvas-tooltip" data-tooltip="Lista · T" onClick={() => void canvas.createItem("list")} type="button"><CheckSquare2 aria-hidden="true" /></button>
-          <button aria-label="Crear una nota (N)" className="canvas-tooltip" data-tooltip="Nota · N" onClick={() => void canvas.createItem("note")} type="button"><StickyNote aria-hidden="true" /></button>
-          <button aria-label="Añadir una imagen (I)" className="canvas-tooltip" data-tooltip="Imagen · I" onClick={() => canvas.openImagePicker(true)} type="button"><ImagePlus aria-hidden="true" /></button>
-          <button aria-label="Añadir un enlace" className="canvas-tooltip" data-tooltip="Enlace" onClick={() => void canvas.addLink()} type="button"><Link2 aria-hidden="true" /></button>
+          <AddItemPicker
+            disabled={canvas.creating}
+            onCountdown={(input) => void canvas.createItem("countdown", input)}
+            onCreate={(kind) => void canvas.createItem(kind)}
+            onImage={() => canvas.openImagePicker(true)}
+            onLink={(url) => void canvas.addLink(undefined, url)}
+          />
         </div>
         <input accept="image/avif,image/jpeg,image/png,image/webp" className="sr-only" {...canvas.imageInputHandlers} ref={imageInput} type="file" />
       </header>
@@ -172,7 +175,7 @@ export function HomeCanvas({ items: initialItems }: { items: OrbitItem[] }) {
         <div className="home-canvas-board" ref={boardRef} style={{ transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})` }}>
           {rootItems.map((item) => (
             <HomeDragItem dragCameraOffset={dragCameraStart ? { x: camera.x - dragCameraStart.x, y: camera.y - dragCameraStart.y } : undefined} editing={canvas.editingId === item.id} item={item} key={item.id} onDelete={() => canvas.removeItem(item)} onDuplicate={() => void canvas.duplicateItem(item)} onEdit={() => canvas.setEditingId((current) => current === item.id ? null : item.id)} onExpand={() => { if (!didDragRef.current) setExpandedImage(item); }} zoom={camera.zoom}>
-              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChangeCover={canvas.openCoverPicker} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
+              <OrbitCanvasItem editing={canvas.editingId === item.id} item={item} onAddChild={(parentId, kind) => void canvas.addChild(parentId, kind)} onChangeCover={canvas.openCoverPicker} onChildAdded={canvas.childAdded} onCloseFolder={canvas.closeFolder} onExpandImage={() => { if (!didDragRef.current) setExpandedImage(item); }} onItemUpdated={canvas.applyItem} onOpenFolder={canvas.setOpenFolderId} onSaveNote={canvas.saveNote} onToggleCheck={canvas.toggleCheck} openFolderId={canvas.openFolderId} spaceKind={null} />
             </HomeDragItem>
           ))}
         </div>

@@ -1,15 +1,17 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- signed, user-uploaded URLs cannot be declared as fixed Next image hosts. */
 
-import { Copy, Edit3, Expand, Link2, Trash2 } from "lucide-react";
+import { Copy, Edit3, Expand, Trash2 } from "lucide-react";
 
+import { CountdownWidget } from "@/components/items/countdown-widget";
 import { FolderWidget } from "@/components/items/folder-widget";
+import { LinkCard } from "@/components/items/link-card";
 import { ListWidget } from "@/components/items/list-widget";
 import { SheetWidget } from "@/components/spaces/sheet-widget";
 import type { ItemKind } from "@/lib/item-nesting";
 import type { OrbitItem } from "@/lib/orbit-item";
 
-export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpenFolder, onCloseFolder, onChangeCover, onAddChild, onToggleCheck, onChildAdded, onSaveNote, onExpandImage }: {
+export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpenFolder, onCloseFolder, onChangeCover, onAddChild, onToggleCheck, onChildAdded, onSaveNote, onExpandImage, onItemUpdated }: {
   editing: boolean;
   item: OrbitItem;
   onAddChild: (parentId: string, kind: ItemKind) => void;
@@ -17,6 +19,7 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
   onChildAdded: (parentId: string, child: OrbitItem) => void;
   onCloseFolder: (id: string, parentId: string | null) => void;
   onExpandImage?: () => void;
+  onItemUpdated?: (item: OrbitItem) => void;
   onOpenFolder: (id: string) => void;
   onSaveNote: (next: { body: Record<string, unknown>; id: string; title: string }) => void;
   onToggleCheck: (id: string, checked: boolean) => void;
@@ -33,6 +36,7 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
         onChangeCover={onChangeCover}
         onChildAdded={onChildAdded}
         onCloseFolder={onCloseFolder}
+        onItemUpdated={onItemUpdated}
         onOpenFolder={onOpenFolder}
         onToggleCheck={onToggleCheck}
         spaceKind={spaceKind}
@@ -51,20 +55,10 @@ export function OrbitCanvasItem({ item, editing, openFolderId, spaceKind, onOpen
     );
   }
   if (item.kind === "link" && item.url) {
-    return (
-      <a className="space-link-widget" href={item.url} rel="noreferrer" target="_blank">
-        <Link2 aria-hidden="true" />
-        <span><strong>{item.title}</strong><small>{item.url}</small></span>
-      </a>
-    );
+    return <LinkCard item={item} onUpdated={onItemUpdated} spaceKind={spaceKind} />;
   }
-  if (item.kind === "countdown") {
-    return (
-      <article className="countdown-widget">
-        <p>{item.title}</p>
-        <time dateTime={item.dueDate ?? undefined}>{item.dueDate}</time>
-      </article>
-    );
+  if (item.kind === "countdown" && item.dueDate) {
+    return <CountdownWidget dueDate={item.dueDate} title={item.title} />;
   }
   return null;
 }

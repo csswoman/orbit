@@ -12,7 +12,7 @@ export type DeadlineItem = {
   image_url: string | null;
   is_recurring: boolean;
   source_id: string;
-  space_type: "food_item" | "gacha_event" | "subscription";
+  space_type: "food_item" | "gacha_event" | "subscription" | "orbit_item";
   title: string;
 };
 
